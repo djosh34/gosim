@@ -345,8 +345,23 @@ func (o *resizeOp) String() string {
 	return fmt.Sprintf("resize file:%d size:%d", o.inode, o.size)
 }
 
+// cloneUserString copies s, a string from the simulated program, for the file
+// system to keep. It is marked go:norace because the race detector does not
+// see the program hand its memory to a system call: the copy, and later
+// reads of the caller's memory, would look like data races.
+//
+//go:norace
+func cloneUserString(s string) string {
+	b := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		b[i] = s[i]
+	}
+	return string(b)
+}
+
 type dirOpPart struct {
-	dir  int
+	dir int
+	// name is a copy of the caller's string (cloneUserString).
 	name string
 	file int
 }
@@ -758,7 +773,7 @@ func (fs *Filesystem) Mkdir(dirInode int, path string) error {
 		parts: []dirOpPart{
 			{
 				dir:  dirInode,
-				name: name,
+				name: cloneUserString(name),
 				file: inode,
 			},
 		},
@@ -896,7 +911,7 @@ func (fs *Filesystem) Remove(dirInode int, path string, rmDir bool) error {
 		parts: []dirOpPart{
 			{
 				dir:  dirInode,
-				name: name,
+				name: cloneUserString(name),
 				file: -1,
 			},
 		},
@@ -943,12 +958,12 @@ func (fs *Filesystem) Rename(fromInode int, fromPath string, toInode int, toPath
 		parts: []dirOpPart{
 			{
 				dir:  fromInode,
-				name: fromName,
+				name: cloneUserString(fromName),
 				file: -1,
 			},
 			{
 				dir:  toInode,
-				name: toName,
+				name: cloneUserString(toName),
 				file: inode,
 			},
 		},
@@ -992,7 +1007,7 @@ func (fs *Filesystem) OpenFile(dirInode int, path string, flag int) (int, error)
 				parts: []dirOpPart{
 					{
 						dir:  dirInode,
-						name: name,
+						name: cloneUserString(name),
 						file: inode,
 					},
 				},
