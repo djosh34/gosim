@@ -89,7 +89,19 @@ type InternalTest struct {
 	F    func(*T)
 }
 
-type F struct{}
+// F is a fuzz target's argument. gosim does not run fuzz targets, so tests
+// that only compile with them still translate.
+type F struct {
+	common
+}
+
+func (f *F) Add(args ...any) {
+	gosimruntime.Unimplemented("testing.F.Add")
+}
+
+func (f *F) Fuzz(ff any) {
+	gosimruntime.Unimplemented("testing.F.Fuzz")
+}
 
 type PB struct{}
 

@@ -92,6 +92,11 @@ func computePackageHash(translateToolHash Hash, pkg *packages.Package, importHas
 			log.Fatal(err)
 		}
 	}
+	for _, path := range pkg.EmbedFiles {
+		if err := cacheKeyHasher.addFile(path); err != nil {
+			log.Fatal(err)
+		}
+	}
 	for _, path := range pkg.OtherFiles {
 		if err := cacheKeyHasher.addFile(path); err != nil {
 			log.Fatal(err)

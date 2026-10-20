@@ -2,7 +2,9 @@ package translate
 
 import (
 	"fmt"
+	"go/ast"
 	"go/token"
+	"go/types"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -74,9 +76,24 @@ func (t *packageTranslator) rewriteIdentImpl(ident *dst.Ident) {
 		}
 	*/
 
+	// a test function used as a value, as in t.Run(name, TestFoo), has the
+	// new name of its declaration (rewriteTestFunc)
+	if ident.Path == "" && t.testFuncs[ident.Name] {
+		if astIdent, ok := t.astMap.Nodes[ident].(*ast.Ident); ok {
+			if fn, ok := t.typesInfo.Uses[astIdent].(*types.Func); ok && fn.Parent() == fn.Pkg().Scope() {
+				ident.Name = t.globalInfo.ByPackage[t.pkgPath].Rewritten[ident.Name]
+				return
+			}
+		}
+	}
+
 	// rewrite specific selectors
 	selector := packageSelector{Pkg: ident.Path, Selector: ident.Name}
 	replacement, ok := replacements[selector]
+	if ok && replacement.Pkg == translatedHooksPackage && t.pkgPath == hooksGo127Package {
+		// The hooks call the originals they replace elsewhere.
+		ok = false
+	}
 	if !ok {
 		// rewrite entire packages
 		if replaced, ok := t.replacedPkgs[ident.Path]; ok {

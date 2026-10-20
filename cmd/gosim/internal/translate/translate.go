@@ -50,6 +50,7 @@ func (gi *GlobalInfo) merge(pkg string, globals *PackageGlobalInfo) {
 	// they even show up here anyway? you can't import them.
 	if existing, ok := gi.ByPackage[pkg]; ok {
 		maps.Copy(existing.Container, globals.Container)
+		maps.Copy(existing.ShouldShare, globals.ShouldShare)
 		maps.Copy(existing.Rewritten, globals.Rewritten)
 	} else {
 		gi.ByPackage[pkg] = &PackageGlobalInfo{
@@ -281,6 +282,10 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 			results.CollectedTests = append(results.CollectedTests, packageSelector{Pkg: args.pkg.PkgPath, Selector: test})
 			globalInfo.Rewritten[test] = "Impl" + test
 		}
+		for _, name := range globals.hidden {
+			testFuncs[name] = true
+			globalInfo.Rewritten[name] = "Impl" + name
+		}
 	}
 
 	outputPackage := args.replacedPkgs[args.pkg.PkgPath]
@@ -377,6 +382,25 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 			// even though we do not modify the file
 			prefixed := append([]byte(header), bytes...)
 			if err := writer.stage(pathForFile(outputPackage, filepath.Base(filePath)), prefixed); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+
+	// copy the files that //go:embed variables hold, which stay
+	// package-level variables (collectGlobalsDecl)
+	if len(args.pkg.EmbedFiles) > 0 {
+		pkgDir := filepath.Dir(args.pkg.GoFiles[0])
+		for _, filePath := range args.pkg.EmbedFiles {
+			rel, err := filepath.Rel(pkgDir, filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			bytes, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := writer.stage(pathForFile(outputPackage, rel), bytes); err != nil {
 				log.Fatal(err)
 			}
 		}

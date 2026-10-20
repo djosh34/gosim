@@ -519,6 +519,8 @@ type goroutine struct {
 	// fipsIndicator is the FIPS 140-3 service indicator of
 	// crypto/internal/fips140, kept per goroutine like the Go runtime does.
 	fipsIndicator uint8
+	// fipsBypassed is set inside crypto/fips140.WithoutEnforcement.
+	fipsBypassed bool
 }
 
 func newGoroutine(id int, parent *goroutine, spawnEventID int, fun func(), machine *Machine, token RaceToken) *goroutine {
@@ -585,6 +587,7 @@ func freeGoroutine(g *goroutine) {
 	g.parkPanicTraceback = nil
 	g.parkPanicValue = ""
 	g.fipsIndicator = 0
+	g.fipsBypassed = false
 	g.entryFun = nil
 	g.entryToken = RaceToken{}
 	g.syscallCache = nil
@@ -999,6 +1002,26 @@ func FIPSIndicator() uint8 {
 //go:norace
 func SetFIPSIndicator(indicator uint8) {
 	getg().fipsIndicator = indicator
+}
+
+// FIPSBypassed reports whether the current goroutine runs inside
+// crypto/fips140.WithoutEnforcement.
+//
+// Marked go:norace to read fipsBypassed
+//
+//go:norace
+func FIPSBypassed() bool {
+	return getg().fipsBypassed
+}
+
+// SetFIPSBypassed sets whether the current goroutine runs inside
+// crypto/fips140.WithoutEnforcement.
+//
+// Marked go:norace to write fipsBypassed
+//
+//go:norace
+func SetFIPSBypassed(bypassed bool) {
+	getg().fipsBypassed = bypassed
 }
 
 // Fatal ends the current run with ErrFatal, like a fatal error in the Go

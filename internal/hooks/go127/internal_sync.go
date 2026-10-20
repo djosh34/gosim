@@ -18,6 +18,9 @@ func InternalSync_runtime_canSpin(i int) bool {
 	return false
 }
 
+// runtime_doSpin is never called, since runtime_canSpin is false.
+func InternalSync_runtime_doSpin() {}
+
 func InternalSync_runtime_nanotime() int64 {
 	return gosimruntime.Nanotime()
 }

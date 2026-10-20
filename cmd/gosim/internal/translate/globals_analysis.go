@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 	"strings"
 
 	"github.com/dave/dst"
@@ -18,6 +19,9 @@ type globalsCollector struct {
 	globalsFields []string
 	shouldShare   map[string]bool
 	tests         []string
+	// hidden are the fuzz targets, benchmarks and examples. gosim does not
+	// run them; they are renamed so go test does not run them either.
+	hidden []string
 
 	dontTranslate map[packageSelector]bool
 }
@@ -81,6 +85,10 @@ var globalsDontTranslateGo127 = map[packageSelector]bool{
 	{Pkg: "crypto/internal/bigmod", Selector: "supportADX"}:                   true,
 
 	{Pkg: "github.com/cespare/xxhash/v2", Selector: "primes"}: true,
+}
+
+func isEmbedDirective(comment string) bool {
+	return strings.HasPrefix(comment, "//go:embed ")
 }
 
 func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {
@@ -155,6 +163,12 @@ func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {
 				}
 			}
 
+			// A //go:embed variable stays where it is, as a package-level
+			// variable: the go command fills it in, and nothing changes it.
+			if slices.ContainsFunc(append(genDecl.Decs.Start.All(), spec.Decs.Start.All()...), isEmbedDirective) {
+				continue
+			}
+
 			if t.pkgPath == "golang.org/x/net/http2/hpack" && n == "staticTable" {
 				shouldShare = true
 			}
@@ -200,10 +214,11 @@ func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {
 	}
 }
 
+// testParams are the prefixes of the functions go test runs, with the
+// testing type each takes.
+var testParams = map[string]string{"Test": "T", "Fuzz": "F", "Benchmark": "B"}
+
 func (t *globalsCollector) collectFuncDecl(funcDecl *dst.FuncDecl) {
-	if !strings.HasPrefix(funcDecl.Name.Name, "Test") {
-		return
-	}
 	if funcDecl.Recv != nil {
 		return
 	}
@@ -213,11 +228,16 @@ func (t *globalsCollector) collectFuncDecl(funcDecl *dst.FuncDecl) {
 	if funcDecl.Type.Results != nil {
 		return
 	}
+	name := funcDecl.Name.Name
+	if strings.HasPrefix(name, "Example") && len(funcDecl.Type.Params.List) == 0 {
+		t.hidden = append(t.hidden, name)
+		return
+	}
 	if len(funcDecl.Type.Params.List) != 1 {
 		return
 	}
 	param := funcDecl.Type.Params.List[0]
-	if len(param.Names) != 1 {
+	if len(param.Names) > 1 {
 		return
 	}
 	unaryExpr, ok := param.Type.(*dst.StarExpr)
@@ -225,13 +245,19 @@ func (t *globalsCollector) collectFuncDecl(funcDecl *dst.FuncDecl) {
 		return
 	}
 	ident, ok := unaryExpr.X.(*dst.Ident)
-	if !ok {
+	if !ok || ident.Path != "testing" {
 		return
 	}
-	if ident.Path != "testing" || ident.Name != "T" {
-		return
+	for prefix, typ := range testParams {
+		if !strings.HasPrefix(name, prefix) || ident.Name != typ {
+			continue
+		}
+		if prefix == "Test" {
+			t.tests = append(t.tests, name)
+		} else {
+			t.hidden = append(t.hidden, name)
+		}
 	}
-	t.tests = append(t.tests, funcDecl.Name.Name)
 }
 
 func (t *globalsCollector) collectGlobals(file *dst.File) {

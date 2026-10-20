@@ -88,10 +88,15 @@ var PublicExportHacks = map[string][]string{
 
 // XXX: replace the package instead
 var replacements = map[packageSelector]packageSelector{
-	{Pkg: "runtime", Selector: "AddCleanup"}:   {Pkg: gosimruntimePackage, Selector: "AddCleanup"},
-	{Pkg: "runtime", Selector: "SetFinalizer"}: {Pkg: gosimruntimePackage, Selector: "SetFinalizer"},
-	{Pkg: "runtime", Selector: "GOOS"}:         {Pkg: gosimruntimePackage, Selector: "GOOS"},
-	{Pkg: "runtime", Selector: "Gosched"}:      {Pkg: gosimruntimePackage, Selector: "Yield"},
+	{Pkg: "runtime/pprof", Selector: "Do"}:                 {Pkg: translatedHooksPackage, Selector: "PprofDo"},
+	{Pkg: "runtime/pprof", Selector: "ForLabels"}:          {Pkg: translatedHooksPackage, Selector: "PprofForLabels"},
+	{Pkg: "runtime/pprof", Selector: "Label"}:              {Pkg: translatedHooksPackage, Selector: "PprofLabel"},
+	{Pkg: "runtime/pprof", Selector: "SetGoroutineLabels"}: {Pkg: translatedHooksPackage, Selector: "PprofSetGoroutineLabels"},
+	{Pkg: "runtime/pprof", Selector: "WithLabels"}:         {Pkg: translatedHooksPackage, Selector: "PprofWithLabels"},
+	{Pkg: "runtime", Selector: "AddCleanup"}:               {Pkg: gosimruntimePackage, Selector: "AddCleanup"},
+	{Pkg: "runtime", Selector: "SetFinalizer"}:             {Pkg: gosimruntimePackage, Selector: "SetFinalizer"},
+	{Pkg: "runtime", Selector: "GOOS"}:                     {Pkg: gosimruntimePackage, Selector: "GOOS"},
+	{Pkg: "runtime", Selector: "Gosched"}:                  {Pkg: gosimruntimePackage, Selector: "Yield"},
 }
 
 const gosimModPath = gosimtool.Module
@@ -99,9 +104,11 @@ const gosimModPath = gosimtool.Module
 const (
 	gosimruntimePackage = gosimModPath + "/gosimruntime"
 	hooksGo127Package   = gosimModPath + "/internal/hooks/go127"
-	reflectPackage      = gosimModPath + "/internal/reflect"
-	simulationPackage   = gosimModPath + "/internal/simulation"
-	testingPackage      = gosimModPath + "/internal/testing"
+	// translatedHooksPackage is hooksGo127Package after translation.
+	translatedHooksPackage = "translated/" + gosimModPath + "/internal_/hooks/go127"
+	reflectPackage         = gosimModPath + "/internal/reflect"
+	simulationPackage      = gosimModPath + "/internal/simulation"
+	testingPackage         = gosimModPath + "/internal/testing"
 )
 
 var TranslatedRuntimePackages = []string{
@@ -113,10 +120,10 @@ var TranslatedRuntimePackages = []string{
 
 const (
 	// loadDepGraph fairly quickly loads the dependency graph
-	loadDepGraph = packages.NeedName | packages.NeedFiles | packages.NeedModule | packages.NeedImports | packages.NeedDeps
+	loadDepGraph = packages.NeedName | packages.NeedFiles | packages.NeedEmbedFiles | packages.NeedModule | packages.NeedImports | packages.NeedDeps
 	// loadSyntaxAndTypes relatively slowly loads detailed types and syntax information
 	loadSyntaxAndTypes = packages.NeedSyntax | packages.NeedName | packages.NeedTypes |
-		packages.NeedTypesInfo | packages.NeedFiles | packages.NeedImports
+		packages.NeedTypesInfo | packages.NeedFiles | packages.NeedEmbedFiles | packages.NeedImports
 )
 
 func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.LoadMode, tests bool) ([]*packages.Package, error) {

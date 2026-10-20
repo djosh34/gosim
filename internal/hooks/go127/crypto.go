@@ -10,6 +10,22 @@ func CryptoInternalFips140_setIndicator(indicator uint8) {
 	gosimruntime.SetFIPSIndicator(indicator)
 }
 
+func CryptoFips140_isBypassed() bool {
+	return gosimruntime.FIPSBypassed()
+}
+
+func CryptoFips140_setBypass() {
+	gosimruntime.SetFIPSBypassed(true)
+}
+
+func CryptoFips140_unsetBypass() {
+	gosimruntime.SetFIPSBypassed(false)
+}
+
+func CryptoInternalFips140depsTime_monoTime() int64 {
+	return gosimruntime.Nanotime()
+}
+
 func CryptoInternalFips140_fatal(msg string) {
 	gosimruntime.Fatal(msg)
 }

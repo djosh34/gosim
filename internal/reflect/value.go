@@ -326,16 +326,18 @@ func (iter *MapIter) Next() bool {
 	return iter.inner.Next()
 }
 
+// zeroIter is the iterator of a MapIter reset to the zero Value. Like
+// reflect's, its Key and Value panic.
 type zeroIter struct{}
 
 func (z zeroIter) Value() reflect.Value {
-	gosimruntime.Unimplemented("reflect.zeroIter.Value")
-	panic("unreachable")
+	var iter reflect.MapIter
+	return iter.Value()
 }
 
 func (z zeroIter) Key() reflect.Value {
-	gosimruntime.Unimplemented("reflect.zeroIter.Key")
-	panic("unreachable")
+	var iter reflect.MapIter
+	return iter.Key()
 }
 
 func (z zeroIter) Next() bool {

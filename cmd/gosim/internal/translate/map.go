@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"log"
+	"slices"
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/dstutil"
@@ -179,6 +180,17 @@ func (t *packageTranslator) rewriteMapNil(c *dstutil.Cursor) {
 }
 
 func (t *packageTranslator) rewriteMapLiteral(c *dstutil.Cursor) {
+	// &map[K]V{...}: the translated literal is a function call, whose
+	// address cannot be taken
+	if unary, ok := c.Node().(*dst.UnaryExpr); ok && unary.Op == token.AND {
+		if lit, ok := unary.X.(*dst.CompositeLit); ok {
+			if _, ok := t.isMapType(lit); ok {
+				c.Replace(&dst.CallExpr{Fun: t.newRuntimeSelector("AddressOf"), Args: []dst.Expr{t.apply(lit).(dst.Expr)}})
+				return
+			}
+		}
+	}
+
 	// map literal
 	compositeLit, ok := c.Node().(*dst.CompositeLit)
 	if !ok {
@@ -466,6 +478,7 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 	}
 
 	// m[x], m[y], a, b =
+	var before, after []dst.Stmt
 	for i, lhs := range assignStmt.Lhs {
 		x, index, ok := t.mapIndexForRewrite(lhs)
 		if !ok {
@@ -482,7 +495,7 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 		elemType := mapType.Type.Elem()
 
 		tmp := "val" + t.suffix()
-		c.InsertBefore(&dst.DeclStmt{
+		before = append(before, &dst.DeclStmt{
 			Decl: &dst.GenDecl{
 				Tok: token.VAR,
 				Specs: []dst.Spec{
@@ -496,7 +509,7 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 			},
 		})
 		assignStmt.Lhs[i] = dst.NewIdent(tmp)
-		c.InsertAfter(&dst.ExprStmt{
+		after = append(after, &dst.ExprStmt{
 			Decs: dst.ExprStmtDecorations{
 				NodeDecs: assignStmt.Decs.NodeDecs,
 			},
@@ -511,5 +524,25 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 				},
 			},
 		})
+	}
+	if len(before) == 0 {
+		return
+	}
+	if c.Index() < 0 {
+		// The assignment is not in a list of statements, as in
+		// "if m[x], err = f(); err != nil". Run the statements in a
+		// function literal instead.
+		stmts := append(append(before, assignStmt), after...)
+		c.Replace(&dst.ExprStmt{X: &dst.CallExpr{Fun: &dst.FuncLit{
+			Type: &dst.FuncType{Params: &dst.FieldList{}},
+			Body: &dst.BlockStmt{List: stmts},
+		}}})
+		return
+	}
+	for _, stmt := range before {
+		c.InsertBefore(stmt)
+	}
+	for _, stmt := range slices.Backward(after) {
+		c.InsertAfter(stmt)
 	}
 }

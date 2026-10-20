@@ -64,6 +64,12 @@ func ExtractMap[M ~struct{ Impl *mapImpl[K, V] }, K comparable, V any](m M) Map[
 	return Map[K, V](m)
 }
 
+// AddressOf returns a pointer to a copy of v. The translation of &map[K]V{...}
+// uses it.
+func AddressOf[T any](v T) *T {
+	return &v
+}
+
 // MapConstraint is the translation of the constraint ~map[K]V. It accepts
 // Map[K, V] and every named map type with keys K and values V.
 type MapConstraint[K comparable, V any] interface {

@@ -45,17 +45,16 @@ func Syscall_Exit(code int) {
 	gosimruntime.Unimplemented("syscall.Exit")
 }
 
-func Syscall_runtimeSetenv(k, v string) {
-	gosimruntime.Unimplemented("syscall.runtimeSetenv")
-}
+// The runtime keeps a copy of the environment for cgo, which the simulation
+// does not have, so syscall's own copy is enough.
 
-func Syscall_runtimeUnsetenv(k string) {
-	gosimruntime.Unimplemented("syscall.runtimeUnsetenv")
-}
+func Syscall_runtimeSetenv(k, v string) {}
+
+func Syscall_runtimeUnsetenv(k string) {}
 
 func Syscall_rawSyscallNoError(trap, a1, a2, a3 uintptr) (r1, r2 uintptr) {
-	gosimruntime.Unimplemented("syscall.rawSyscallNoError")
-	panic("unreachable")
+	r1, r2, _ = simulation.RawSyscall6(trap, a1, a2, a3, 0, 0, 0)
+	return r1, r2
 }
 
 func Syscall_rawVforkSyscall(trap, a1, a2, a3 uintptr) (r1 uintptr, err syscall.Errno) {

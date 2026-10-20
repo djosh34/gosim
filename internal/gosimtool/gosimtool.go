@@ -222,6 +222,8 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string, tags []string) st
 		once.Do(func() {
 			var name string
 			var flags []string
+			// The command is a module of its own, so go run works only
+			// in a module that requires it; GOSIMTOOL names a built one.
 			if prebuilt, ok := os.LookupEnv("GOSIMTOOL"); ok {
 				name = prebuilt
 			} else {
@@ -240,7 +242,7 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string, tags []string) st
 			t.Logf("looks like an uncached test run... running `%s`", strings.Join(cmd.Args, " "))
 			out, err := cmd.CombinedOutput()
 			if err != nil {
-				t.Fatalf("gosim build-tests failed: %s\n\n%s", err, string(out))
+				t.Fatalf("gosim build-tests failed: %s\n\n%s\nSet GOSIMTOOL to the path of a gosim binary to use it instead of go run.", err, string(out))
 			}
 		})
 	}

@@ -47,6 +47,10 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 
 		id := &dst.Ident{Name: typ.Obj().Name(), Path: path}
 		t.rewriteIdentImpl(id)
+		if id.Path == "testing" {
+			// rewriteIdentImpl skips new idents of package testing
+			id.Path = t.replacedPkgs["testing"]
+		}
 
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
@@ -82,6 +86,10 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 
 		id := &dst.Ident{Name: typ.Obj().Name(), Path: path}
 		t.rewriteIdentImpl(id)
+		if id.Path == "testing" {
+			// rewriteIdentImpl skips new idents of package testing
+			id.Path = t.replacedPkgs["testing"]
+		}
 
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...

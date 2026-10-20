@@ -246,6 +246,11 @@ func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*
 	var lastIfSmt *dst.BlockStmt
 
 	for _, initializer := range t.typesInfo.InitOrder {
+		if forTest && t.dstMap.Nodes[initializer.Rhs] == nil {
+			// The package's non-test files, which the base package
+			// translates, hold this initializer.
+			continue
+		}
 		var lhs []dst.Expr
 
 		shouldShare := t.globalInfo.ByPackage[t.pkgPath].ShouldShare[initializer.Lhs[0].Name()]
