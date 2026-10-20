@@ -227,6 +227,13 @@ var hooksGensyscallGo123ByArch = map[string]map[packageSelector]packageSelector{
 // that the translated code keeps.
 var acceptedgo123Linknames = map[packageSelector]packageSelector{}
 
+// nativeLinknamePackages are packages whose functions without a body call the
+// runtime's implementation for the original package. The race detector's
+// functions work on memory addresses, so translated code can call them.
+var nativeLinknamePackages = map[string]bool{
+	"internal/race": true,
+}
+
 // pushedLinknames are functions without a body whose body a translated package
 // pushes to them with its own linkname.
 var pushedLinknames = map[packageSelector]bool{

@@ -154,7 +154,11 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 
 			parts := strings.Split(val, " ")
 
-			if len(parts) == 2 && decl.Body == nil && !pushedLinknames[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}] {
+			if len(parts) == 2 && decl.Body == nil && nativeLinknamePackages[t.pkgPath] {
+				// Call the function the runtime pushes to the original
+				// package.
+				decl.Decs.Start[i] = fmt.Sprintf("//go:linkname %s %s.%s", decl.Name.Name, t.pkgPath, decl.Name.Name)
+			} else if len(parts) == 2 && decl.Body == nil && !pushedLinknames[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}] {
 				// The body is pushed from a package gosim does not
 				// translate, such as runtime.
 				decl.Decs.Start[i] = "// gosim unimplemented: " + val

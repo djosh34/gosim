@@ -499,8 +499,9 @@ func (t *packageTranslator) markSyncFuncsNorace(c *dstutil.Cursor) {
 		return
 	}
 
-	if t.pkgPath == "sync" {
-		// XXX: jank mark all funcs norace in "sync" package
+	if t.pkgPath == "sync" || t.pkgPath == "internal/sync" {
+		// XXX: jank mark all funcs norace in "sync" package, and in
+		// "internal/sync" which holds Mutex since Go 1.24
 		decl.Decs.Start = append(decl.Decs.Start, "//go:norace")
 	}
 }
