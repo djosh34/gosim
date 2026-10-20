@@ -187,7 +187,8 @@ func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {
 			}
 
 			// A //go:embed variable stays where it is, as a package-level
-			// variable: the go command fills it in, and nothing changes it.
+			// variable, since the go command fills it in. The program may
+			// change it; gosimruntime restores it at the start of every run.
 			if slices.ContainsFunc(append(genDecl.Decs.Start.All(), spec.Decs.Start.All()...), isEmbedDirective) {
 				t.embedded = append(t.embedded, embeddedVar{name: n, kind: embedKind(obj.Type())})
 				continue
