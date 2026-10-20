@@ -39,8 +39,8 @@
 >   of the stores, not on pointer addresses; each operation takes time linear
 >   in the map's size. `hash/maphash` hashes with FNV-1a, and
 >   `maphash.Comparable` is unimplemented.
-> - Every run starts with the embedded contents of `//go:embed` `[]byte`
->   variables.
+> - Every run starts with the embedded values of `//go:embed` variables; the
+>   machines of one run share them.
 
 Gosim is a simulation testing framework that aims to make it easier to write
 reliable distributed systems code in go. Gosim takes standard go programs and

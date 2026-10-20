@@ -381,7 +381,7 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	scheduler := newScheduler(seed, logger, checksummer, extraenv)
 	defer setgs(scheduler)()
 
-	resetEmbeddedBytes()
+	resetEmbedded()
 
 	InitSteps()
 

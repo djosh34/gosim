@@ -1,37 +1,62 @@
 package gosimruntime
 
-import "bytes"
+import (
+	"bytes"
+	"embed"
+)
 
-// embeddedBytes is a //go:embed variable of type []byte and its embedded
-// contents.
-type embeddedBytes struct {
-	variable *[]byte
-	contents []byte
+// The //go:embed variables of the translated packages, each with its
+// embedded value. Translated packages register them from init.
+var (
+	embeddedBytes   []embedded[[]byte]
+	embeddedStrings []embedded[string]
+	embeddedFSes    []embedded[embed.FS]
+)
+
+type embedded[T any] struct {
+	variable *T
+	value    T
 }
 
-var allEmbeddedBytes []embeddedBytes
-
-// RegisterEmbeddedBytes records a //go:embed variable of type []byte, so that
-// every run starts with its embedded contents even when an earlier run changed
-// them. Translated packages call it from init.
+// RegisterEmbeddedBytes records a //go:embed []byte variable, so that every
+// run starts with its embedded contents, also when an earlier run changed
+// them.
 func RegisterEmbeddedBytes(variable *[]byte) {
-	allEmbeddedBytes = append(allEmbeddedBytes, embeddedBytes{variable: variable, contents: bytes.Clone(*variable)})
+	embeddedBytes = append(embeddedBytes, embedded[[]byte]{variable: variable, value: bytes.Clone(*variable)})
 }
 
-// resetEmbeddedBytes gives every //go:embed []byte variable its embedded
-// contents again.
+// RegisterEmbeddedString records a //go:embed string variable, so that every
+// run starts with its embedded value.
+func RegisterEmbeddedString(variable *string) {
+	embeddedStrings = append(embeddedStrings, embedded[string]{variable: variable, value: *variable})
+}
+
+// RegisterEmbeddedFS records a //go:embed embed.FS variable, so that every
+// run starts with its embedded files.
+func RegisterEmbeddedFS(variable *embed.FS) {
+	embeddedFSes = append(embeddedFSes, embedded[embed.FS]{variable: variable, value: *variable})
+}
+
+// resetEmbedded gives every //go:embed variable its embedded value again.
+// The machines of a run share the variables.
 //
 // Marked go:norace: the goroutines of the run before used the variables, and
-// nothing orders their accesses before this write for the race detector.
+// nothing orders their accesses before these writes for the race detector.
 //
 //go:norace
-func resetEmbeddedBytes() {
-	for _, e := range allEmbeddedBytes {
+func resetEmbedded() {
+	for _, e := range embeddedBytes {
 		// A loop, not copy: the runtime's copy tells the race detector.
-		b := make([]byte, len(e.contents))
-		for i, c := range e.contents {
+		b := make([]byte, len(e.value))
+		for i, c := range e.value {
 			b[i] = c
 		}
 		*e.variable = b
+	}
+	for _, e := range embeddedStrings {
+		*e.variable = e.value
+	}
+	for _, e := range embeddedFSes {
+		*e.variable = e.value
 	}
 }

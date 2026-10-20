@@ -19,8 +19,8 @@ type globalsCollector struct {
 	globalsFields []string
 	shouldShare   map[string]bool
 	tests         []string
-	// embeddedBytes are the //go:embed variables of type []byte.
-	embeddedBytes []string
+	// embedded are the //go:embed variables.
+	embedded []embeddedVar
 	// hidden are the fuzz targets, benchmarks and examples. gosim does not
 	// run them; they are renamed so go test does not run them either.
 	hidden []string
@@ -87,6 +87,27 @@ var globalsDontTranslateGo127 = map[packageSelector]bool{
 	{Pkg: "crypto/internal/bigmod", Selector: "supportADX"}:                   true,
 
 	{Pkg: "github.com/cespare/xxhash/v2", Selector: "primes"}: true,
+}
+
+// An embeddedVar is a //go:embed variable. Its kind is the type it holds:
+// "Bytes", "String" or "FS".
+type embeddedVar struct {
+	name string
+	kind string
+}
+
+// embedKind returns the kind of a //go:embed variable of type typ: a []byte,
+// a string, or an embed.FS, or a type defined as one of those.
+func embedKind(typ types.Type) string {
+	switch typ := typ.Underlying().(type) {
+	case *types.Slice:
+		return "Bytes"
+	case *types.Basic:
+		if typ.Info()&types.IsString != 0 {
+			return "String"
+		}
+	}
+	return "FS"
 }
 
 func isEmbedDirective(comment string) bool {
@@ -168,9 +189,7 @@ func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {
 			// A //go:embed variable stays where it is, as a package-level
 			// variable: the go command fills it in, and nothing changes it.
 			if slices.ContainsFunc(append(genDecl.Decs.Start.All(), spec.Decs.Start.All()...), isEmbedDirective) {
-				if slice, ok := obj.Type().(*types.Slice); ok && types.Identical(slice.Elem(), types.Typ[types.Byte]) {
-					t.embeddedBytes = append(t.embeddedBytes, n)
-				}
+				t.embedded = append(t.embedded, embeddedVar{name: n, kind: embedKind(obj.Type())})
 				continue
 			}
 

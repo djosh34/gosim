@@ -4,7 +4,7 @@ package behavior
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"hash/maphash"
 	"io"
 	"net"
@@ -194,13 +194,27 @@ func TestLoopbackListener(t *testing.T) {
 //go:embed testdata/embed.txt
 var embeddedBytes []byte
 
-// TestEmbedBytesPerRun changes an embedded []byte; the meta test checks that
-// the next run sees the embedded contents again.
+type namedBytes []byte
+
+//go:embed testdata/embed.txt
+var embeddedNamedBytes namedBytes
+
+//go:embed testdata/embed.txt
+var embeddedFS embed.FS
+
+// TestEmbedBytesPerRun changes embedded variables; the meta test checks that
+// the next run sees their embedded values again.
 func TestEmbedBytesPerRun(t *testing.T) {
-	if string(embeddedBytes) != "embedded by TestEmbed\n" {
-		t.Errorf("got %q", embeddedBytes)
+	if string(embeddedBytes) != "embedded by TestEmbed\n" || string(embeddedNamedBytes) != "embedded by TestEmbed\n" || embedded != "embedded by TestEmbed\n" {
+		t.Errorf("got %q, %q, %q", embeddedBytes, embeddedNamedBytes, embedded)
+	}
+	if _, err := embeddedFS.ReadFile("testdata/embed.txt"); err != nil {
+		t.Error(err)
 	}
 	embeddedBytes[0] = 'X'
+	embeddedNamedBytes[0] = 'X'
+	embedded = "changed"
+	embeddedFS = embed.FS{}
 }
 
 func TestContextInCleanup(t *testing.T) {

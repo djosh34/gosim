@@ -122,15 +122,19 @@ func NewStack() *Stack {
 	return b
 }
 
+// ErrNoFreePort means every port has a listener.
+var ErrNoFreePort = errors.New("no free port")
+
 // allocatePort returns a port no listener uses.
-func (n *Stack) allocatePort() uint16 {
-	for {
+func (n *Stack) allocatePort() (uint16, error) {
+	for range 1 << 16 {
 		port := n.nextPort
 		n.nextPort++
 		if _, ok := n.listeners[port]; !ok {
-			return port
+			return port, nil
 		}
 	}
+	return 0, ErrNoFreePort
 }
 
 func (b *Stack) processIncomingPacket(packet *Packet) {
@@ -257,7 +261,10 @@ func (n *Stack) OpenListener(port uint16) (*Listener, error) {
 	defer n.mu.Unlock()
 
 	if port == 0 {
-		port = n.allocatePort()
+		var err error
+		if port, err = n.allocatePort(); err != nil {
+			return nil, err
+		}
 	}
 	if _, ok := n.listeners[port]; ok {
 		return nil, ErrPortAlreadyInUse
@@ -534,7 +541,10 @@ func (n *Stack) OpenStream(addr netip.AddrPort) (*Stream, error) {
 		addr = netip.AddrPortFrom(n.endpoint.Addr(), addr.Port())
 	}
 
-	localPort := n.allocatePort()
+	localPort, err := n.allocatePort()
+	if err != nil {
+		return nil, err
+	}
 	id := ConnId{
 		Hosts: HostPair{
 			SourceHost: n.endpoint.Addr(),
