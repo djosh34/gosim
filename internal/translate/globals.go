@@ -213,6 +213,14 @@ func (t *packageTranslator) collectGlobalDefImpl(decl *dst.GenDecl) {
 	decl.Specs = filtered
 }
 
+// The names of the generated functions that return a package's globals. They
+// are long so they do not clash with names in the translated package, such as
+// the G in crypto/internal/fips140/mlkem.
+const (
+	globalsFunc        = "GosimGlobals"
+	globalsFuncForTest = "GosimGlobalsForTest"
+)
+
 func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*dst.File, error) {
 	var inits []dst.Stmt
 
@@ -222,13 +230,13 @@ func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*
 	// anonymous members. That might make the source of the globals a nice
 	// implementation detail.
 
-	funcName := "G"
+	funcName := globalsFunc
 	typName := "Globals"
 	varName := "globals"
 	initFuncName := "initializers"
 	field := "Globals"
 	if forTest {
-		funcName = "GForTest"
+		funcName = globalsFuncForTest
 		typName = "GlobalsForTest"
 		varName = "globalsForTest"
 		initFuncName = "initializersForTest"

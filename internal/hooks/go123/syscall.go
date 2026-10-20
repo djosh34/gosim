@@ -12,27 +12,28 @@ import (
 )
 
 func Syscall_runtime_BeforeFork() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtime_BeforeFork")
 }
 
 func Syscall_runtime_AfterFork() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtime_AfterFork")
 }
 
 func Syscall_runtime_AfterForkInChild() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtime_AfterForkInChild")
 }
 
 func Syscall_runtime_BeforeExec() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtime_BeforeExec")
 }
 
 func Syscall_runtime_AfterExec() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtime_AfterExec")
 }
 
 func Syscall_hasWaitingReaders(rw *sync.RWMutex) bool {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.hasWaitingReaders")
+	panic("unreachable")
 }
 
 func Syscall_Getpagesize() int {
@@ -41,31 +42,35 @@ func Syscall_Getpagesize() int {
 }
 
 func Syscall_Exit(code int) {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.Exit")
 }
 
 func Syscall_runtimeSetenv(k, v string) {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtimeSetenv")
 }
 
 func Syscall_runtimeUnsetenv(k string) {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtimeUnsetenv")
 }
 
 func Syscall_rawSyscallNoError(trap, a1, a2, a3 uintptr) (r1, r2 uintptr) {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.rawSyscallNoError")
+	panic("unreachable")
 }
 
-func Syscall_rawVforkSyscall(trap, a1, a2 uintptr) (r1 uintptr, err syscall.Errno) {
-	panic("gosim not implemented")
+func Syscall_rawVforkSyscall(trap, a1, a2, a3 uintptr) (r1 uintptr, err syscall.Errno) {
+	gosimruntime.Unimplemented("syscall.rawVforkSyscall")
+	panic("unreachable")
 }
 
 func Syscall_runtime_doAllThreadsSyscall(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.runtime_doAllThreadsSyscall")
+	panic("unreachable")
 }
 
 func Syscall_cgocaller(unsafe.Pointer, ...uintptr) uintptr {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.cgocaller")
+	panic("unreachable")
 }
 
 func Syscall_runtime_envs() []string {
@@ -85,9 +90,15 @@ func Syscall_RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, 
 }
 
 func Syscall_gettimeofday(timeval unsafe.Pointer) syscall.Errno {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("syscall.gettimeofday")
+	panic("unreachable")
 }
 
 func Syscall_FcntlFlock(fd uintptr, cmd int, lk *syscall.Flock_t) error {
 	return simulation.SyscallSysFcntlFlock(fd, cmd, lk)
+}
+
+func InternalRuntimeSyscallLinux_Syscall6(num, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, errno uintptr) {
+	r1, r2, err := simulation.RawSyscall6(num, a1, a2, a3, a4, a5, a6)
+	return r1, r2, uintptr(err)
 }

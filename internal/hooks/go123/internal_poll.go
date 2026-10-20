@@ -9,7 +9,8 @@ import (
 )
 
 func InternalPoll_runtimeNano() int64 {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("internal/poll.runtimeNano")
+	panic("unreachable")
 }
 
 func InternalPoll_runtime_Semacquire(addr *uint32) {
@@ -25,7 +26,8 @@ func InternalPoll_runtime_pollServerInit() {
 }
 
 func InternalPoll_runtime_isPollServerDescriptor(fd uintptr) bool {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("internal/poll.runtime_isPollServerDescriptor")
+	panic("unreachable")
 }
 
 // FIXME: returning a pointer here is very suspect, these are uintptrs on the
@@ -43,7 +45,8 @@ func InternalPoll_runtime_pollClose(ctx *syscallabi.PollDesc) {
 }
 
 func InternalPoll_runtime_pollWaitCanceled(ctx *syscallabi.PollDesc, mode int) {
-	panic("not implemented") // only used on windows
+	// only used on windows
+	gosimruntime.Unimplemented("internal/poll.runtime_pollWaitCanceled")
 }
 
 func InternalPoll_runtime_pollReset(ctx *syscallabi.PollDesc, mode int) int {

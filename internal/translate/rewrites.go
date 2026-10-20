@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/token"
 	"log/slog"
-	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -124,10 +123,21 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 		return
 	}
 
+	// Hooks replace package-level functions. A method with the same name as a
+	// hooked function, such as internal/synctest's Bubble.Run, keeps its body.
+	var linkTo packageSelector
+	hasHook := false
+	if decl.Recv == nil {
+		linkTo, hasHook = t.hooks[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}]
+	}
+
 	// XXX: this misses some linkname stuff
 	// XXX: this wrongly assumes a linkname is going to be part of a FuncDecl's Decs; they can be anywhere in the code
 
 	hasLinkname := false
+	// unimplemented is set when the function has no body and its linkname
+	// points at a body gosim does not translate.
+	unimplemented := false
 	for i, val := range decl.Decs.Start {
 		if val == "//go:uintptrkeepalive" {
 			decl.Decs.Start[i] = "//go:uintptrescapes" // uintptrkeepalive is only allowed in standard library...
@@ -136,7 +146,7 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 		if strings.HasPrefix(val, "//go:linkname") {
 			hasLinkname = true
 
-			if _, ok := t.hooks[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}]; ok {
+			if hasHook {
 				decl.Decs.Start[i] = "//"
 				hasLinkname = false
 				continue
@@ -144,9 +154,11 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 
 			parts := strings.Split(val, " ")
 
-			if len(parts) == 2 && decl.Body == nil {
-				// TODO: make this fail the build?
-				slog.Error("unknown linkname with no body", "pkg", t.pkgPath, "name", decl.Name.Name)
+			if len(parts) == 2 && decl.Body == nil && !pushedLinknames[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}] {
+				// The body is pushed from a package gosim does not
+				// translate, such as runtime.
+				decl.Decs.Start[i] = "// gosim unimplemented: " + val
+				unimplemented = true
 			}
 
 			if len(parts) == 3 {
@@ -156,7 +168,12 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 				if idx2 != -1 {
 					idx := idx1 + idx2
 					pkg, name := dest[:idx], dest[idx+1:]
-					if newPkg, ok := t.replacedPkgs[pkg]; ok {
+					if decl.Body == nil && pkg == t.pkgPath && name == decl.Name.Name {
+						// A linkname to itself: the body lives in a package
+						// gosim does not translate, such as runtime.
+						decl.Decs.Start[i] = "// gosim unimplemented: " + val
+						unimplemented = true
+					} else if newPkg, ok := t.replacedPkgs[pkg]; ok {
 						slog.Debug("rewriting linkname", "pkg", t.pkgPath, "name", decl.Name.Name)
 
 						parts[2] = fmt.Sprintf("%s.%s", newPkg, name)
@@ -166,20 +183,30 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 					} else if strings.HasPrefix(pkg, "gosimnotranslate/") {
 						parts[2] = fmt.Sprintf("%s.%s", strings.TrimPrefix(pkg, "gosimnotranslate/"), name)
 						decl.Decs.Start[i] = strings.Join(parts, " ")
+					} else if decl.Body == nil {
+						decl.Decs.Start[i] = "// gosim unimplemented: " + val
+						unimplemented = true
 					} else {
-						// TODO: make this fail the build?
-						slog.Error("unknown linkname", "pkg", t.pkgPath, "name", decl.Name.Name, "targetPkg", pkg, "targetName", name)
+						// The function pushes its body into a package gosim
+						// does not translate. The translated copy must not
+						// replace that package's function.
+						slog.Debug("removing linkname", "pkg", t.pkgPath, "name", decl.Name.Name, "targetPkg", pkg, "targetName", name)
+						decl.Decs.Start[i] = "// gosim removed: " + val
+						hasLinkname = false
 					}
 				}
 			}
 		}
 	}
 
-	if decl.Body != nil {
-		if _, ok := t.hooks[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}]; ok {
-			// take over!
-			decl.Body = nil
-		}
+	if unimplemented {
+		t.stub(decl)
+		return
+	}
+
+	if decl.Body != nil && hasHook {
+		// take over!
+		decl.Body = nil
 	}
 
 	// XXX: hack
@@ -190,10 +217,7 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 			}
 		}
 
-		// XXX: detect all these not implemented ones? output them?
-		// XXX: something similar for... other "bad" calls?
-
-		if linkTo, ok := t.hooks[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}]; ok {
+		if hasHook {
 			selector := RewriteSelector(t.pkgPath, decl.Name.Name)
 
 			pkg := linkTo.Pkg
@@ -215,8 +239,8 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 		} else if t.keepAsmPkgs[t.pkgPath] {
 			slog.Debug("keeping asm header", "pkg", t.pkgPath, "name", decl.Name.Name)
 		} else {
-			slog.Error("missing function body", "pkg", t.pkgPath, "name", decl.Name.Name)
-			os.Exit(1)
+			// An assembly function, or a function implemented in runtime.
+			t.stub(decl)
 		}
 	}
 
@@ -229,6 +253,30 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 	if decl.Name.Name == "Mmap" && (t.pkgPath == "syscall" || t.pkgPath == "golang.org/x/sys/unix") {
 		decl.Decs.Start = append(decl.Decs.Start, "//go:nocheckptr")
 	}
+}
+
+// stub gives decl a body that fails through gosimruntime.Unimplemented.
+func (t *packageTranslator) stub(decl *dst.FuncDecl) {
+	for i, val := range decl.Decs.Start {
+		if val == "//go:noescape" {
+			// Only allowed on functions without a body.
+			decl.Decs.Start[i] = "//"
+		}
+	}
+
+	name := strconv.Quote(t.pkgPath + "." + decl.Name.Name)
+	body := []dst.Stmt{&dst.ExprStmt{X: &dst.CallExpr{
+		Fun:  t.newRuntimeSelector("Unimplemented"),
+		Args: []dst.Expr{&dst.BasicLit{Kind: token.STRING, Value: name}},
+	}}}
+	if decl.Type.Results != nil && len(decl.Type.Results.List) > 0 {
+		// Unimplemented never returns.
+		body = append(body, &dst.ExprStmt{X: &dst.CallExpr{
+			Fun:  dst.NewIdent("panic"),
+			Args: []dst.Expr{&dst.BasicLit{Kind: token.STRING, Value: strconv.Quote("unreachable")}},
+		}})
+	}
+	decl.Body = &dst.BlockStmt{List: body}
 }
 
 func removeLinknames(commentLines []string) {

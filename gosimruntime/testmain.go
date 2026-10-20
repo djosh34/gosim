@@ -48,6 +48,7 @@ type runResult struct {
 	Failed    bool
 	LogOutput []byte
 	Err       string // TODO: reconsider this type?
+	Artifacts map[string][]byte
 }
 
 type Runtime interface {
@@ -237,6 +238,7 @@ func TestMain(rt Runtime) {
 			Checksum:  result.Checksum,
 			Failed:    result.Failed,
 			LogOutput: result.LogOutput,
+			Artifacts: result.Artifacts,
 		}
 		if result.Err != nil {
 			metaResult.Err = result.Err.Error()

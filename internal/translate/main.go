@@ -81,12 +81,14 @@ var keepAsmPackagesGo123 = map[string]bool{
 
 var PublicExportHacks = map[string][]string{
 	"encoding/binary":                  {"littleEndian"},
+	"encoding/json/jsontext":           {"export"},
 	"internal/poll":                    {"errNetClosing"},
 	"github.com/golang/protobuf/proto": {"enumsByName"},
 }
 
 // XXX: replace the package instead
 var replacements = map[packageSelector]packageSelector{
+	{Pkg: "runtime", Selector: "AddCleanup"}:   {Pkg: gosimruntimePackage, Selector: "AddCleanup"},
 	{Pkg: "runtime", Selector: "SetFinalizer"}: {Pkg: gosimruntimePackage, Selector: "SetFinalizer"},
 	{Pkg: "runtime", Selector: "GOOS"}:         {Pkg: gosimruntimePackage, Selector: "GOOS"},
 	{Pkg: "runtime", Selector: "Gosched"}:      {Pkg: gosimruntimePackage, Selector: "Yield"},
@@ -126,14 +128,18 @@ func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.Load
 
 	// apply build config to packages config
 	// TODO: build tags plan (rename files, force GOOS and GOARCH)
-	tags := []string{"sim"}
+	// purego selects the Go implementations of crypto and other packages
+	// over their assembly, which gosim cannot translate.
+	tags := []string{"sim", "purego"}
 	if b.Race {
 		tags = append(tags, "race")
 	}
+	tags = append(tags, b.Tags...)
 	// TODO: if we support varying GOARCH here, we should select the arch-specific hooks at runtime...
 	env := append(os.Environ(), "GOOS="+b.GOOS, "GOARCH="+b.GOARCH, "CGO_ENABLED=0")
 	cfg.BuildFlags = []string{"-tags", strings.Join(tags, ",")}
 	cfg.Env = env
+	cfg.Overlay = stdOverlay()
 
 	// load packages
 	packages, err := packages.Load(cfg, patterns...)
@@ -581,10 +587,20 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 		deps[replacedPkgs[path]] = times
 	}
 
+	var unimplemented []gosimtool.UnimplementedHook
+	for _, res := range allResults {
+		unimplemented = append(unimplemented, res.Unimplemented...)
+	}
+	slices.SortFunc(unimplemented, func(a, b gosimtool.UnimplementedHook) int {
+		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Symbol, b.Symbol))
+	})
+	unimplemented = slices.Compact(unimplemented)
+
 	return &gosimtool.TranslateOutput{
 		RootOutputDir: rootOutputDir,
 		Packages:      out,
 		Deps:          deps,
+		Unimplemented: unimplemented,
 	}, nil
 }
 

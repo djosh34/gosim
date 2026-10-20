@@ -11,7 +11,8 @@ var hooksGo123 = map[packageSelector]packageSelector{
 	// amd64 only?
 	{Pkg: "golang.org/x/sys/unix", Selector: "gettimeofday"}: {Pkg: hooksGo123Package},
 
-	{Pkg: "hash/maphash", Selector: "runtime_rand"}: {Pkg: hooksGo123Package},
+	{Pkg: "hash/maphash", Selector: "runtime_memhash"}: {Pkg: hooksGo123Package},
+	{Pkg: "hash/maphash", Selector: "runtime_rand"}:    {Pkg: hooksGo123Package},
 
 	{Pkg: "internal/abi", Selector: "FuncPCABI0"}:        {Pkg: hooksGo123Package},
 	{Pkg: "internal/abi", Selector: "FuncPCABIInternal"}: {Pkg: hooksGo123Package},
@@ -58,15 +59,12 @@ var hooksGo123 = map[packageSelector]packageSelector{
 	{Pkg: "internal/poll", Selector: "runtime_pollWait"}:               {Pkg: hooksGo123Package},
 	{Pkg: "internal/poll", Selector: "runtime_pollWaitCanceled"}:       {Pkg: hooksGo123Package},
 
-	{Pkg: "internal/runtime/syscall", Selector: "Syscall6"}: {Pkg: hooksGo123Package},
+	{Pkg: "internal/runtime/syscall/linux", Selector: "Syscall6"}: {Pkg: hooksGo123Package},
 
 	{Pkg: "internal/syscall/unix", Selector: "GetRandom"}: {Pkg: hooksGo123Package},
 	{Pkg: "internal/syscall/unix", Selector: "fcntl"}:     {Pkg: hooksGo123Package},
 	{Pkg: "internal/syscall/unix", Selector: "Openat"}:    {Pkg: hooksGo123Package},
 	{Pkg: "internal/syscall/unix", Selector: "Unlinkat"}:  {Pkg: hooksGo123Package},
-
-	{Pkg: "iter", Selector: "coroswitch"}: {Pkg: hooksGo123Package},
-	{Pkg: "iter", Selector: "newcoro"}:    {Pkg: hooksGo123Package},
 
 	{Pkg: "maps", Selector: "clone"}: {Pkg: hooksGo123Package},
 
@@ -107,17 +105,32 @@ var hooksGo123 = map[packageSelector]packageSelector{
 	{Pkg: "runtime/trace", Selector: "userTaskCreate"}: {Pkg: hooksGo123Package},
 	{Pkg: "runtime/trace", Selector: "userTaskEnd"}:    {Pkg: hooksGo123Package},
 
+	{Pkg: "crypto/internal/constanttime", Selector: "boolToUint8"}: {Pkg: hooksGo123Package},
+	{Pkg: "crypto/internal/fips140", Selector: "fatal"}:            {Pkg: hooksGo123Package},
+	{Pkg: "crypto/internal/fips140", Selector: "getIndicator"}:     {Pkg: hooksGo123Package},
+	{Pkg: "crypto/internal/fips140", Selector: "setIndicator"}:     {Pkg: hooksGo123Package},
+	{Pkg: "crypto/internal/sysrand", Selector: "fatal"}:            {Pkg: hooksGo123Package},
+	{Pkg: "crypto/rand", Selector: "fatal"}:                        {Pkg: hooksGo123Package},
+
+	{Pkg: "internal/runtime/atomic", Selector: "LoadAcquintptr"}:  {Pkg: hooksGo123Package},
+	{Pkg: "internal/runtime/atomic", Selector: "StoreReluintptr"}: {Pkg: hooksGo123Package},
+
+	{Pkg: "internal/sync", Selector: "fatal"}:                   {Pkg: hooksGo123Package},
+	{Pkg: "internal/sync", Selector: "runtime_SemacquireMutex"}: {Pkg: hooksGo123Package},
+	{Pkg: "internal/sync", Selector: "runtime_Semrelease"}:      {Pkg: hooksGo123Package},
+	{Pkg: "internal/sync", Selector: "runtime_canSpin"}:         {Pkg: hooksGo123Package},
+	{Pkg: "internal/sync", Selector: "runtime_nanotime"}:        {Pkg: hooksGo123Package},
+	{Pkg: "internal/sync", Selector: "runtime_rand"}:            {Pkg: hooksGo123Package},
+	{Pkg: "internal/sync", Selector: "throw"}:                   {Pkg: hooksGo123Package},
+
+	{Pkg: "internal/synctest", Selector: "IsInBubble"}: {Pkg: hooksGo123Package},
+
 	{Pkg: "sync", Selector: "fatal"}:                       {Pkg: hooksGo123Package},
-	{Pkg: "sync", Selector: "runtime_LoadAcquintptr"}:      {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_Semacquire"}:          {Pkg: hooksGo123Package},
-	{Pkg: "sync", Selector: "runtime_SemacquireMutex"}:     {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_SemacquireRWMutex"}:   {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_SemacquireRWMutexR"}:  {Pkg: hooksGo123Package},
+	{Pkg: "sync", Selector: "runtime_SemacquireWaitGroup"}: {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_Semrelease"}:          {Pkg: hooksGo123Package},
-	{Pkg: "sync", Selector: "runtime_StoreReluintptr"}:     {Pkg: hooksGo123Package},
-	{Pkg: "sync", Selector: "runtime_canSpin"}:             {Pkg: hooksGo123Package},
-	{Pkg: "sync", Selector: "runtime_doSpin"}:              {Pkg: hooksGo123Package},
-	{Pkg: "sync", Selector: "runtime_nanotime"}:            {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_notifyListAdd"}:       {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_notifyListCheck"}:     {Pkg: hooksGo123Package},
 	{Pkg: "sync", Selector: "runtime_notifyListNotifyAll"}: {Pkg: hooksGo123Package},
@@ -131,7 +144,6 @@ var hooksGo123 = map[packageSelector]packageSelector{
 
 	{Pkg: "sync/atomic", Selector: "AddInt32"}:              {Pkg: hooksGo123Package},
 	{Pkg: "sync/atomic", Selector: "AddInt64"}:              {Pkg: hooksGo123Package},
-	{Pkg: "sync/atomic", Selector: "AddPointer"}:            {Pkg: hooksGo123Package},
 	{Pkg: "sync/atomic", Selector: "AddUint32"}:             {Pkg: hooksGo123Package},
 	{Pkg: "sync/atomic", Selector: "AddUint64"}:             {Pkg: hooksGo123Package},
 	{Pkg: "sync/atomic", Selector: "AddUintptr"}:            {Pkg: hooksGo123Package},
@@ -196,16 +208,28 @@ var hooksGo123 = map[packageSelector]packageSelector{
 	// amd64 only?
 	{Pkg: "syscall", Selector: "gettimeofday"}: {Pkg: hooksGo123Package},
 
-	{Pkg: "time", Selector: "Sleep"}:       {Pkg: hooksGo123Package},
-	{Pkg: "time", Selector: "now"}:         {Pkg: hooksGo123Package},
-	{Pkg: "time", Selector: "newTimer"}:    {Pkg: hooksGo123Package},
-	{Pkg: "time", Selector: "resetTimer"}:  {Pkg: hooksGo123Package},
-	{Pkg: "time", Selector: "runtimeNano"}: {Pkg: hooksGo123Package},
-	{Pkg: "time", Selector: "stopTimer"}:   {Pkg: hooksGo123Package},
+	{Pkg: "weak", Selector: "runtime_makeStrongFromWeak"}:  {Pkg: hooksGo123Package},
+	{Pkg: "weak", Selector: "runtime_registerWeakPointer"}: {Pkg: hooksGo123Package},
+
+	{Pkg: "time", Selector: "Sleep"}:            {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "now"}:              {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "newTimer"}:         {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "resetTimer"}:       {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "runtimeIsBubbled"}: {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "runtimeNano"}:      {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "runtimeNow"}:       {Pkg: hooksGo123Package},
+	{Pkg: "time", Selector: "stopTimer"}:        {Pkg: hooksGo123Package},
 }
 
 var hooksGensyscallGo123ByArch = map[string]map[packageSelector]packageSelector{}
 
-var acceptedgo123Linknames = map[packageSelector]packageSelector{
-	{Pkg: "hash/maphash", Selector: "runtime_memhash"}: {Pkg: "runtime", Selector: "memhash"},
+// acceptedgo123Linknames are linknames to packages gosim does not translate
+// that the translated code keeps.
+var acceptedgo123Linknames = map[packageSelector]packageSelector{}
+
+// pushedLinknames are functions without a body whose body a translated package
+// pushes to them with its own linkname.
+var pushedLinknames = map[packageSelector]bool{
+	// Pushed by crypto/sha3.fips140hash_sha3Unwrap.
+	{Pkg: "crypto/internal/fips140hash", Selector: "sha3Unwrap"}: true,
 }

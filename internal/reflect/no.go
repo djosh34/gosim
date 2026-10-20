@@ -1,20 +1,26 @@
 package reflect
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/jellevandenhooff/gosim/gosimruntime"
+)
 
 // link names used by the reflect2 package, used indirectly by etcd. expose them
 // to let the package compile. make all of them panic to prevent usage.
 
 func unsafe_New(rtype unsafe.Pointer) unsafe.Pointer {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.unsafe_New")
+	panic("unreachable")
 }
 
 func typedmemmove(rtype unsafe.Pointer, dst, src unsafe.Pointer) {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.typedmemmove")
 }
 
 func unsafe_NewArray(rtype unsafe.Pointer, length int) unsafe.Pointer {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.unsafe_NewArray")
+	panic("unreachable")
 }
 
 type noSliceHeader struct {
@@ -24,15 +30,17 @@ type noSliceHeader struct {
 }
 
 func typedslicecopy(elemType unsafe.Pointer, dst, src noSliceHeader) int {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.typedslicecopy")
+	panic("unreachable")
 }
 
 func mapassign(rtype unsafe.Pointer, m unsafe.Pointer, key, val unsafe.Pointer) {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.mapassign")
 }
 
 func mapaccess(rtype unsafe.Pointer, m unsafe.Pointer, key unsafe.Pointer) (val unsafe.Pointer) {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.mapaccess")
+	panic("unreachable")
 }
 
 type noHiter struct {
@@ -42,17 +50,19 @@ type noHiter struct {
 }
 
 func mapiterinit(rtype unsafe.Pointer, m unsafe.Pointer) *noHiter {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.mapiterinit")
+	panic("unreachable")
 }
 
 func mapiternext(it *noHiter) {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.mapiternext")
 }
 
 func ifaceE2I(rtype unsafe.Pointer, src interface{}, dst unsafe.Pointer) {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.ifaceE2I")
 }
 
 func makemap(rtype unsafe.Pointer, cap int) (m unsafe.Pointer) {
-	panic("no")
+	gosimruntime.Unimplemented("reflect.makemap")
+	panic("unreachable")
 }

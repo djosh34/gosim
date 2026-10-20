@@ -82,3 +82,11 @@ func SetSimulationTimeout(d time.Duration) {
 		panic(err)
 	}
 }
+
+// WriteArtifact saves a copy of data under name in the result of the current
+// run, for the test that started the run: a test using metatesting reads it
+// from RunResult.Artifacts. The simulation cannot read it back. Writing a name
+// again replaces its data.
+func WriteArtifact(name string, data []byte) {
+	gosimruntime.WriteArtifact(name, data)
+}

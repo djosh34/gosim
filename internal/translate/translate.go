@@ -67,6 +67,7 @@ type TranslatePackageResult struct {
 	CollectedTests  []packageSelector
 	GlobalInfo      *PackageGlobalInfo
 	TranslatedFiles map[string][]byte
+	Unimplemented   []gosimtool.UnimplementedHook
 }
 
 func filterTestFiles(files []*ast.File, fset *token.FileSet) []*ast.File {
@@ -244,10 +245,9 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 	// }
 
 	globalField := map[packageKind]string{
-		// TODO: share these constants with the global file code
-		PackageKindBase:    "G",
-		PackageKindTests:   "G",
-		PackageKindForTest: "GForTest",
+		PackageKindBase:    globalsFunc,
+		PackageKindTests:   globalsFunc,
+		PackageKindForTest: globalsFuncForTest,
 	}[kind]
 	for _, global := range globals.globalsFields {
 		if _, ok := globalInfo.Container[global]; ok {
@@ -403,6 +403,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 	results.GlobalInfo = globalInfo
 	results.PackagePath = args.pkg.PkgPath
 	results.TranslatedFiles = writer.extract()
+	results.Unimplemented = translator.unimplemented
 
 	return &results
 }
@@ -439,6 +440,8 @@ type packageTranslator struct {
 	globalInfo *GlobalInfo
 
 	needsUnsafe bool
+
+	unimplemented []gosimtool.UnimplementedHook
 
 	forTest bool
 
@@ -621,6 +624,8 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 
 	dstFile = t.apply(dstFile).(*dst.File)
 
+	t.collectUnimplemented(dstFile)
+
 	if t.needsUnsafe {
 		var importDecl *dst.GenDecl
 
@@ -655,6 +660,84 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 	}
 
 	return dstFile, nil
+}
+
+// collectUnimplemented records every function that calls
+// gosimruntime.Unimplemented, and keeps the compiler from inlining it, so its
+// symbol in a test binary shows that the binary can reach it.
+func (t *packageTranslator) collectUnimplemented(file *dst.File) {
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*dst.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		found := false
+		dst.Inspect(fn.Body, func(n dst.Node) bool {
+			call, ok := n.(*dst.CallExpr)
+			if !ok || len(call.Args) != 1 {
+				return true
+			}
+			if id, ok := call.Fun.(*dst.Ident); !ok || id.Path != gosimruntimePackage || id.Name != "Unimplemented" {
+				return true
+			}
+			lit, ok := call.Args[0].(*dst.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			name, err := strconv.Unquote(lit.Value)
+			if err != nil {
+				return true
+			}
+			t.unimplemented = append(t.unimplemented, gosimtool.UnimplementedHook{
+				Name:   name,
+				Symbol: symbolName(t.replacedPkgs[t.pkgPath], fn),
+			})
+			found = true
+			return true
+		})
+		if found && !slices.Contains(fn.Decs.Start, "//go:noinline") {
+			fn.Decs.Start.Append("//go:noinline")
+		}
+	}
+}
+
+// symbolName returns the linker's name for fn in package pkg.
+func symbolName(pkg string, fn *dst.FuncDecl) string {
+	// The linker escapes dots in the last element of the package path, and a
+	// few other characters everywhere (cmd/internal/objabi.PathToPrefix).
+	var b strings.Builder
+	last := strings.LastIndex(pkg, "/")
+	for i := 0; i < len(pkg); i++ {
+		c := pkg[i]
+		if c <= ' ' || c == '%' || c == '"' || c >= 0x7f || (c == '.' && i > last) {
+			fmt.Fprintf(&b, "%%%02x", c)
+			continue
+		}
+		b.WriteByte(c)
+	}
+	b.WriteString(".")
+	if fn.Recv != nil && len(fn.Recv.List) == 1 {
+		typ := fn.Recv.List[0].Type
+		star := false
+		if s, ok := typ.(*dst.StarExpr); ok {
+			typ, star = s.X, true
+		}
+		var name string
+		switch typ := typ.(type) {
+		case *dst.Ident:
+			name = typ.Name
+		case *dst.IndexExpr:
+			name = typ.X.(*dst.Ident).Name + "[...]"
+		case *dst.IndexListExpr:
+			name = typ.X.(*dst.Ident).Name + "[...]"
+		}
+		if star {
+			name = "(*" + name + ")"
+		}
+		b.WriteString(name + ".")
+	}
+	b.WriteString(fn.Name.Name)
+	return b.String()
 }
 
 func makePublicExportHackFile(pkgName string, names []string) (*dst.File, error) {

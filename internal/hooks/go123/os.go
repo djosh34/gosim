@@ -8,25 +8,26 @@ func Os_runtime_args() []string {
 }
 
 func Os_sigpipe() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("os.sigpipe")
 }
 
 func Os_runtime_beforeExit(exitCode int) {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("os.runtime_beforeExit")
 }
 
 func Os_runtime_rand() uint64 {
 	return gosimruntime.Fastrand64()
 }
 
-func Os_checkClonePidfd() {
-	panic("gosim not implemented")
+func Os_checkClonePidfd() error {
+	gosimruntime.Unimplemented("os.checkClonePidfd")
+	panic("unreachable")
 }
 
 func Os_ignoreSIGSYS() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("os.ignoreSIGSYS")
 }
 
 func Os_restoreSIGSYS() {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("os.restoreSIGSYS")
 }

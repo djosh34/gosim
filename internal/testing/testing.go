@@ -640,7 +640,8 @@ func (c *common) runCleanup(ph panicHandling) (panicVal any) {
 }
 
 func (c *common) TempDir() string {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.common.TempDir")
+	panic("unreachable")
 }
 
 func (c *common) private() {}
@@ -703,7 +704,7 @@ func (t *T) Parallel() {
 }
 
 func (t *T) Setenv(key, value string) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.T.Setenv")
 }
 
 type B struct {
@@ -711,7 +712,7 @@ type B struct {
 }
 
 func (b *B) Setenv(key, value string) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.B.Setenv")
 }
 
 func (t *T) Deadline() (time.Time, bool) {

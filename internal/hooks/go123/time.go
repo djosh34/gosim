@@ -19,6 +19,15 @@ func Time_now() (sec int64, nsec int32, mono int64) {
 	return
 }
 
+func Time_runtimeNow() (sec int64, nsec int32, mono int64) {
+	return Time_now()
+}
+
+// gosim has no synctest bubbles.
+func Time_runtimeIsBubbled() bool {
+	return false
+}
+
 func Time_runtimeNano() int64 {
 	return gosimruntime.Nanotime()
 }

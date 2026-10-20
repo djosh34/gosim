@@ -294,11 +294,12 @@ func (t *packageTranslator) rewriteMapType(c *dstutil.Cursor) {
 		})
 	}
 
-	// for generics, eject the outer ~ on map...
+	// for generics, replace ~map[K]V with a constraint that also accepts
+	// named map types
 	if unary, ok := c.Node().(*dst.UnaryExpr); ok && unary.Op == token.TILDE {
 		if mapType, ok := unary.X.(*dst.MapType); ok {
 			c.Replace(&dst.IndexListExpr{
-				X: t.newRuntimeSelector("Map"),
+				X: t.newRuntimeSelector("MapConstraint"),
 				Indices: []dst.Expr{
 					mapType.Key,
 					t.apply(mapType.Value).(dst.Expr),

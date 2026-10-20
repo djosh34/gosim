@@ -1,9 +1,13 @@
 package go123
 
+import "github.com/jellevandenhooff/gosim/gosimruntime"
+
 func InternalAbi_FuncPCABI0(f interface{}) uintptr {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("internal/abi.FuncPCABI0")
+	panic("unreachable")
 }
 
 func InternalAbi_FuncPCABIInternal(f interface{}) uintptr {
-	panic("gosim not implemented")
+	gosimruntime.Unimplemented("internal/abi.FuncPCABIInternal")
+	panic("unreachable")
 }

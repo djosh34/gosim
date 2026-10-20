@@ -28,12 +28,17 @@ type BuildConfig struct {
 	GOOS   string
 	GOARCH string
 	Race   bool
+	// Tags are extra build tags, on top of the sim tag translate always sets.
+	Tags []string
 }
 
 func (b BuildConfig) AsDirname() string {
 	name := fmt.Sprintf("%s_%s", b.GOOS, b.GOARCH)
 	if b.Race {
 		name += "_race"
+	}
+	for _, tag := range b.Tags {
+		name += "_" + tag
 	}
 	return name
 }
@@ -42,6 +47,19 @@ type TranslateOutput struct {
 	RootOutputDir string
 	Packages      []string                        // TODO: combine all this in a struct? also include input name?
 	Deps          map[string]map[string]time.Time // pkg -> path -> time
+	// Unimplemented lists, sorted, the hooks in the translated code that
+	// call gosimruntime.Unimplemented.
+	Unimplemented []UnimplementedHook
+}
+
+// An UnimplementedHook is a function in translated code that fails through
+// gosimruntime.Unimplemented.
+type UnimplementedHook struct {
+	// Name is the name passed to gosimruntime.Unimplemented, such as
+	// "internal/cpu.getisar1".
+	Name string
+	// Symbol is the function's symbol in the compiled test binary.
+	Symbol string
 }
 
 func FindGoMod() (string, *modfile.File, error) {
@@ -187,7 +205,7 @@ var (
 	buildOnce   = make(map[string]*sync.Once)
 )
 
-func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
+func GetPathForPrecompiledTestBinary(t *testing.T, pkg string, tags []string) string {
 	didBuild := false
 
 	if isUncachedTestRun() {
@@ -214,6 +232,9 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
 			if race.Enabled {
 				flags = append(flags, "-race")
 			}
+			if len(tags) > 0 {
+				flags = append(flags, "-tags", strings.Join(tags, ","))
+			}
 			flags = append(flags, pkg)
 			cmd := exec.Command(name, flags...)
 			t.Logf("looks like an uncached test run... running `%s`", strings.Join(cmd.Args, " "))
@@ -234,6 +255,7 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
 		GOOS:   "linux",
 		GOARCH: runtime.GOARCH,
 		Race:   race.Enabled,
+		Tags:   tags,
 	}
 
 	outDir := filepath.Join(goModDir, OutputDirectory, "metatest", cfg.AsDirname())
