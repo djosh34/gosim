@@ -20,8 +20,18 @@ func RegisterEmbeddedBytes(variable *[]byte) {
 
 // resetEmbeddedBytes gives every //go:embed []byte variable its embedded
 // contents again.
+//
+// Marked go:norace: the goroutines of the run before used the variables, and
+// nothing orders their accesses before this write for the race detector.
+//
+//go:norace
 func resetEmbeddedBytes() {
 	for _, e := range allEmbeddedBytes {
-		*e.variable = bytes.Clone(e.contents)
+		// A loop, not copy: the runtime's copy tells the race detector.
+		b := make([]byte, len(e.contents))
+		for i, c := range e.contents {
+			b[i] = c
+		}
+		*e.variable = b
 	}
 }
