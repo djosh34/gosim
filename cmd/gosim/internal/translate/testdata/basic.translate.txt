@@ -1278,14 +1278,14 @@ func Mapmultiassign() {
 
 	val8, val9 = "3", 4
 
-	m2.Set(1, val9)
-
 	m1.Set(0, val8)
+
+	m2.Set(1, val9)
 	var val10 string
 	var val11 int
 	val10, val11, foo = "3", 4, 5
-	m2.Set(1, val11)
 	m1.Set(0, val10)
+	m2.Set(1, val11)
 	var val12 string
 	val12, bar, foo = "3", "4", 5
 	m1.Set(0, val12)
@@ -1293,9 +1293,9 @@ func Mapmultiassign() {
 	var val14 string
 	bar, val13, val14, foo = "3", "4", "5", 6
 
-	m1.Set(1, val14)
-
 	m1.Set(0, val13)
+
+	m1.Set(1, val14)
 
 	_ = foo
 	_ = bar
