@@ -208,13 +208,22 @@ var (
 func GetPathForPrecompiledTestBinary(t *testing.T, pkg string, tags []string) string {
 	didBuild := false
 
+	// TODO: test this race stuff somehow. make test output if race is enabled?
+	cfg := BuildConfig{
+		GOOS:   "linux",
+		GOARCH: runtime.GOARCH,
+		Race:   race.Enabled,
+		Tags:   tags,
+	}
+
 	if isUncachedTestRun() {
 		// TODO: figure out if we should pass -race or not?
 		buildOnceMu.Lock()
-		once, ok := buildOnce[pkg]
+		key := cfg.AsDirname() + " " + pkg
+		once, ok := buildOnce[key]
 		if !ok {
 			once = new(sync.Once)
-			buildOnce[pkg] = once
+			buildOnce[key] = once
 		}
 		buildOnceMu.Unlock()
 
@@ -250,14 +259,6 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string, tags []string) st
 	goModDir, err := FindGoModDir()
 	if err != nil {
 		t.Fatalf("Could not find containing go module: %s", err)
-	}
-
-	// TODO: test this race stuff somehow. make test output if race is enabled?
-	cfg := BuildConfig{
-		GOOS:   "linux",
-		GOARCH: runtime.GOARCH,
-		Race:   race.Enabled,
-		Tags:   tags,
 	}
 
 	outDir := filepath.Join(goModDir, OutputDirectory, "metatest", cfg.AsDirname())

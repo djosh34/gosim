@@ -58,9 +58,10 @@ func TestHookSignatures(t *testing.T) {
 		}
 		byPath := make(map[string]*types.Package)
 		for _, pkg := range pkgs {
-			if len(pkg.Errors) == 0 {
-				byPath[pkg.PkgPath] = pkg.Types
+			if len(pkg.Errors) > 0 {
+				t.Fatalf("%s: loading %s: %v", goarch, pkg.PkgPath, pkg.Errors)
 			}
+			byPath[pkg.PkgPath] = pkg.Types
 		}
 
 		for hooked, impl := range hooks {

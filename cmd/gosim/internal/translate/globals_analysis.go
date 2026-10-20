@@ -19,6 +19,8 @@ type globalsCollector struct {
 	globalsFields []string
 	shouldShare   map[string]bool
 	tests         []string
+	// embeddedBytes are the //go:embed variables of type []byte.
+	embeddedBytes []string
 	// hidden are the fuzz targets, benchmarks and examples. gosim does not
 	// run them; they are renamed so go test does not run them either.
 	hidden []string
@@ -166,6 +168,9 @@ func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {
 			// A //go:embed variable stays where it is, as a package-level
 			// variable: the go command fills it in, and nothing changes it.
 			if slices.ContainsFunc(append(genDecl.Decs.Start.All(), spec.Decs.Start.All()...), isEmbedDirective) {
+				if slice, ok := obj.Type().(*types.Slice); ok && types.Identical(slice.Elem(), types.Typ[types.Byte]) {
+					t.embeddedBytes = append(t.embeddedBytes, n)
+				}
 				continue
 			}
 

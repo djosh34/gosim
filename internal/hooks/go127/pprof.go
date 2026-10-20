@@ -4,6 +4,7 @@ import (
 	"context"
 	"runtime/pprof"
 	"slices"
+	"strings"
 )
 
 // The functions of runtime/pprof that take a context.Context stand in for the
@@ -23,7 +24,7 @@ func PprofWithLabels(ctx context.Context, labels pprof.LabelSet) context.Context
 	merged := slices.Clone(pprofLabels(ctx))
 	for _, pair := range pprofLabelPairs(labels) {
 		i, found := slices.BinarySearchFunc(merged, pair[0], func(p [2]string, key string) int {
-			return cmpString(p[0], key)
+			return strings.Compare(p[0], key)
 		})
 		if found {
 			merged[i] = pair
@@ -57,14 +58,4 @@ func PprofSetGoroutineLabels(ctx context.Context) {}
 
 func PprofDo(ctx context.Context, labels pprof.LabelSet, f func(context.Context)) {
 	f(PprofWithLabels(ctx, labels))
-}
-
-func cmpString(a, b string) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
 }

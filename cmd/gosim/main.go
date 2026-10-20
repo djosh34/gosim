@@ -171,7 +171,7 @@ func main() {
 		translateflags := flag.NewFlagSet(commandName("translate"), flag.ExitOnError)
 		race := translateflags.Bool("race", false, "build in -race mode")
 		tags := translateflags.String("tags", "", "a comma-separated list of extra build tags")
-		unimplemented := translateflags.String("unimplemented", "", "path to a file to write the list of unimplemented hooks to")
+		unimplemented := translateflags.String("unimplemented", "", "path to a file to write the list of unimplemented hooks to; the list differs between GOARCH values")
 		translateflags.Parse(cmdArgs)
 
 		cfg.Race = *race

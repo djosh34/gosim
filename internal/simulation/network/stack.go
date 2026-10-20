@@ -19,7 +19,7 @@ const (
 	PacketKindStreamData                     // uses Offset, Count
 	PacketKindStreamAck                      // uses Offset
 	PacketKindStreamWindow                   // uses Count
-	PacketKindStreamFin                      // uses nothing; the sender closed the stream
+	PacketKindStreamFin                      // uses Offset; the sender closed the stream after sending Offset bytes
 )
 
 // XXX: for connId, add a secret extra field so we can gracefully handle delayed
@@ -122,10 +122,15 @@ func NewStack() *Stack {
 	return b
 }
 
+// allocatePort returns a port no listener uses.
 func (n *Stack) allocatePort() uint16 {
-	port := n.nextPort
-	n.nextPort++
-	return port
+	for {
+		port := n.nextPort
+		n.nextPort++
+		if _, ok := n.listeners[port]; !ok {
+			return port
+		}
+	}
 }
 
 func (b *Stack) processIncomingPacket(packet *Packet) {
@@ -218,8 +223,8 @@ func (b *Stack) processIncomingPacket(packet *Packet) {
 		}
 
 		// After a close by the peer, reads end with EOF instead of an
-		// error.
-		stream.finished = packet.Kind == PacketKindStreamFin
+		// error, if all the data the peer sent arrived.
+		stream.finished = packet.Kind == PacketKindStreamFin && packet.Offset == stream.recvPos
 
 		if err := b.closeStream(stream, false); err != nil {
 			// XXX
@@ -319,7 +324,10 @@ func (n *Stack) CloseListener(listener *Listener) error {
 	l.closed = true
 
 	for l.incomingCount > 0 {
-		n.closeStream(l.incoming[l.incomingPos], true)
+		// A pending stream the peer already closed needs no close.
+		if s := l.incoming[l.incomingPos]; !s.closed {
+			n.closeStream(s, true)
+		}
 		l.incoming[l.incomingPos] = nil
 		l.incomingPos++
 		if l.incomingPos == len(l.incoming) {
@@ -577,7 +585,9 @@ func (n *Stack) StreamClose(stream *Stream) error {
 		return ErrStreamClosed
 	}
 
-	n.endpoint.Send(allocPacket(PacketKindStreamFin, stream.id))
+	fin := allocPacket(PacketKindStreamFin, stream.id)
+	fin.Offset = stream.sendPos
+	n.endpoint.Send(fin)
 	if err := n.closeStream(stream, false); err != nil {
 		return err
 	}

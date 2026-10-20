@@ -437,11 +437,21 @@ func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*
 		},
 	}
 
+	// Every run starts with the embedded contents of the //go:embed []byte
+	// variables, which stay package-level variables (collectGlobalsDecl).
+	var registerEmbedded []dst.Stmt
+	for _, name := range t.collect.embeddedBytes {
+		registerEmbedded = append(registerEmbedded, &dst.ExprStmt{X: &dst.CallExpr{
+			Fun:  t.newRuntimeSelector("RegisterEmbeddedBytes"),
+			Args: []dst.Expr{&dst.UnaryExpr{Op: token.AND, X: dst.NewIdent(name)}},
+		}})
+	}
+
 	dstFile.Decls = append(dstFile.Decls, &dst.FuncDecl{
 		Name: dst.NewIdent("init"),
 		Type: &dst.FuncType{},
 		Body: &dst.BlockStmt{
-			List: []dst.Stmt{
+			List: append(registerEmbedded,
 				&dst.AssignStmt{
 					Lhs: []dst.Expr{
 						&dst.SelectorExpr{
@@ -465,7 +475,7 @@ func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*
 						},
 					},
 				},
-			},
+			),
 		},
 	})
 

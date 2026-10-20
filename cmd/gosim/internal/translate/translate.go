@@ -325,8 +325,9 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		testFuncs:           testFuncs,
 		forTest:             forTest,
 		collect: translateCollect{
-			bindspecs: make(map[bindspec]struct{}),
-			maps:      ssaGlobals.readonlyMaps,
+			bindspecs:     make(map[bindspec]struct{}),
+			maps:          ssaGlobals.readonlyMaps,
+			embeddedBytes: globals.embeddedBytes,
 		},
 		hooks:             hooks,
 		acceptedLinknames: acceptedgo127Linknames,
@@ -355,7 +356,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		PackageKindTests:   "gosim_globals_test.go",
 	}[kind]; ok {
 		// write a globals.go, if applicable
-		if len(translator.collect.globalFields) > 0 || len(translator.collect.inits) > 0 || len(translator.collect.bindspecs) > 0 || len(translator.collect.sharedGlobalFields) > 0 || len(translator.collect.maps) > 0 {
+		if len(translator.collect.globalFields) > 0 || len(translator.collect.inits) > 0 || len(translator.collect.bindspecs) > 0 || len(translator.collect.sharedGlobalFields) > 0 || len(translator.collect.maps) > 0 || len(translator.collect.embeddedBytes) > 0 {
 			file, err := makeDetgoGlobalsFile(translator, args.pkg.Name, forTest)
 			if err != nil {
 				log.Fatal(err)
@@ -439,6 +440,7 @@ type translateCollect struct {
 	inits              []string
 	bindspecs          map[bindspec]struct{}
 	maps               []mapInitializer
+	embeddedBytes      []string
 }
 
 type packageSelector struct {

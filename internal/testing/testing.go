@@ -174,9 +174,11 @@ type common struct {
 	cleanups []func()
 
 	// ctx is the test's Context, made when first asked for, and cancelCtx
-	// cancels it before the cleanups run.
-	ctx       context.Context
-	cancelCtx context.CancelFunc
+	// cancels it. ctxCanceled is set when the cleanups start, which cancels
+	// ctx, also when it is made later.
+	ctx         context.Context
+	cancelCtx   context.CancelFunc
+	ctxCanceled bool
 
 	cleanupStarted atomic.Bool // Registered cleanup callbacks have started to execute
 
@@ -630,6 +632,7 @@ func (c *common) runCleanup(ph panicHandling) (panicVal any) {
 	}()
 
 	c.mu.Lock()
+	c.ctxCanceled = true
 	cancelCtx := c.cancelCtx
 	c.mu.Unlock()
 	if cancelCtx != nil {
@@ -659,6 +662,9 @@ func (c *common) Context() context.Context {
 	defer c.mu.Unlock()
 	if c.ctx == nil {
 		c.ctx, c.cancelCtx = context.WithCancel(context.Background())
+		if c.ctxCanceled {
+			c.cancelCtx()
+		}
 	}
 	return c.ctx
 }
@@ -675,7 +681,7 @@ func (c *common) TempDir() string {
 		c.Fatalf("TempDir: %v", err)
 	}
 	c.Cleanup(func() {
-		if err := removeAll(dir); err != nil {
+		if err := removeAll(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
 			c.Errorf("TempDir cleanup: %v", err)
 		}
 	})

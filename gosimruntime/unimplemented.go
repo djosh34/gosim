@@ -15,8 +15,8 @@ func Unimplemented(name string) {
 	getg().upcall(func() {
 		gs := gs.get()
 		gs.logger.slog.Error("unimplemented hook", "name", name)
-		if gs.unimplemented == "" {
-			gs.unimplemented = name
+		if gs.abortDetail == "" {
+			gs.abortDetail = name
 		}
 	})
 	SetAbortError(ErrUnimplemented)

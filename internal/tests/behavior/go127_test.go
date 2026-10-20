@@ -5,6 +5,7 @@ package behavior
 import (
 	"context"
 	_ "embed"
+	"hash/maphash"
 	"io"
 	"net"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 	"weak"
 
 	"github.com/jellevandenhooff/gosim"
@@ -44,8 +46,8 @@ func TestSyncMapRange(t *testing.T) {
 		seen = append(seen, v.(int))
 		return true
 	})
-	slices.Sort(seen)
-	if !slices.Equal(seen, []int{0, 1, 2, 3}) {
+	// Every key hashes to 0, so Range visits the newest key first.
+	if !slices.Equal(seen, []int{3, 2, 1, 0}) {
 		t.Errorf("got %v", seen)
 	}
 	if v, ok := m.Load(keys[2]); !ok || v != 2 {
@@ -187,4 +189,57 @@ func TestLoopbackListener(t *testing.T) {
 	if err != nil || string(b) != "hi" {
 		t.Errorf("got %q %v", b, err)
 	}
+}
+
+//go:embed testdata/embed.txt
+var embeddedBytes []byte
+
+// TestEmbedBytesPerRun changes an embedded []byte; the meta test checks that
+// the next run sees the embedded contents again.
+func TestEmbedBytesPerRun(t *testing.T) {
+	if string(embeddedBytes) != "embedded by TestEmbed\n" {
+		t.Errorf("got %q", embeddedBytes)
+	}
+	embeddedBytes[0] = 'X'
+}
+
+func TestContextInCleanup(t *testing.T) {
+	t.Cleanup(func() {
+		select {
+		case <-t.Context().Done():
+		default:
+			t.Error("the context is not canceled during cleanup")
+		}
+	})
+}
+
+func TestRemovedTempDir(t *testing.T) {
+	if err := os.Remove(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCloseUnacceptedConnection(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond)
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMaphashComparable(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	maphash.Comparable(maphash.MakeSeed(), "key")
 }

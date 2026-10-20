@@ -25,15 +25,22 @@
 >   `gosimruntime.Unimplemented(name)`, which ends the run with
 >   `gosimruntime.ErrUnimplemented` and the hook's name. The translator gives
 >   every function it has no implementation for such a body, where upstream
->   stopped. `gosim translate -unimplemented FILE` writes the list of them.
+>   stopped. `gosim translate -unimplemented FILE` writes the list of them; the
+>   list differs between architectures. `gosim build-tests -allow-unimplemented
+>   FILE` fails when a test binary can reach a hook that FILE does not list.
 > - `gosim translate`, `test` and `build-tests` take `-tags`. Translation
 >   always sets `purego`, so crypto uses its Go code instead of assembly.
 > - A simulated program can pass data to the test that runs it with
 >   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
 >   `MetaT.RunQuiet` runs a test without logging its output.
 > - Weak pointers stay strong and cleanups never run, since the garbage
->   collector is not part of the simulation. `sync.Map` keeps its keys in the
->   order they were stored, so it does not depend on pointer addresses.
+>   collector is not part of the simulation.
+> - `sync.Map` hashes every key to 0, so its order depends only on the order
+>   of the stores, not on pointer addresses; each operation takes time linear
+>   in the map's size. `hash/maphash` hashes with FNV-1a, and
+>   `maphash.Comparable` is unimplemented.
+> - Every run starts with the embedded contents of `//go:embed` `[]byte`
+>   variables.
 
 Gosim is a simulation testing framework that aims to make it easier to write
 reliable distributed systems code in go. Gosim takes standard go programs and

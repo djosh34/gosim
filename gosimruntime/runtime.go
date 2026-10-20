@@ -115,8 +115,9 @@ type scheduler struct {
 
 	abortErr error
 
-	// unimplemented is the first hook passed to Unimplemented.
-	unimplemented string
+	// abortDetail says what ended the run with ErrUnimplemented or ErrFatal:
+	// the first hook passed to Unimplemented or message passed to Fatal.
+	abortDetail string
 
 	// artifacts holds the data passed to WriteArtifact, by name.
 	artifacts map[string][]byte
@@ -380,6 +381,8 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	scheduler := newScheduler(seed, logger, checksummer, extraenv)
 	defer setgs(scheduler)()
 
+	resetEmbeddedBytes()
+
 	InitSteps()
 
 	defaultMachine := newMachine("")
@@ -399,8 +402,8 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	if runErr == ErrMainReturned {
 		runErr = nil
 	}
-	if runErr == ErrUnimplemented {
-		runErr = fmt.Errorf("%w: %s", ErrUnimplemented, scheduler.unimplemented)
+	if runErr == ErrUnimplemented || runErr == ErrFatal {
+		runErr = fmt.Errorf("%w: %s", runErr, scheduler.abortDetail)
 	}
 	var checksum []byte
 	if enableChecksum {
@@ -1029,7 +1032,11 @@ func SetFIPSBypassed(bypassed bool) {
 // recover from it, and it never returns.
 func Fatal(msg string) {
 	getg().upcall(func() {
-		gs.get().logger.slog.Error("fatal error", "msg", msg)
+		gs := gs.get()
+		gs.logger.slog.Error("fatal error", "msg", msg)
+		if gs.abortDetail == "" {
+			gs.abortDetail = msg
+		}
 	})
 	SetAbortError(ErrFatal)
 }
