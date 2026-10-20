@@ -810,7 +810,8 @@ func (fs *Filesystem) Stat(dirInode int, path string) (StatResp, error) {
 	}
 
 	var inode int
-	if name == "." {
+	// The name is empty for the path "/".
+	if name == "." || name == "" {
 		// TODO: clean up...
 		inode = dirInode
 	} else {
@@ -972,7 +973,8 @@ func (fs *Filesystem) OpenFile(dirInode int, path string, flag int) (int, error)
 	}
 
 	var inode int
-	if name != "." {
+	// The name is empty for the path "/".
+	if name != "." && name != "" {
 		inode, ok = dir.entries[name]
 		if !ok {
 			if flag&os.O_CREATE == 0 {

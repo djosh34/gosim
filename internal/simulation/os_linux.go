@@ -1114,8 +1114,18 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 		}
 
 	case *Socket:
-		// TBD
-		// XXX: wowwwwwww we should get this one. better send a close!
+		// Closing a socket closes its stream or listener, so the peer
+		// sees the end of the stream.
+		if fdInternal.Stream != nil {
+			if err := l.machine.netstack.StreamClose(fdInternal.Stream); err != nil && err != network.ErrStreamClosed {
+				return syscall.EBADFD
+			}
+		}
+		if fdInternal.Listener != nil {
+			if err := l.machine.netstack.CloseListener(fdInternal.Listener); err != nil && err != network.ErrListenerClosed {
+				return syscall.EBADFD
+			}
+		}
 
 	default:
 		return syscall.EBADFD
@@ -1289,6 +1299,8 @@ func (l *LinuxOS) SysListen(fd, backlog int, invocation *syscallabi.Syscall) err
 		return syscall.EINVAL
 	}
 	sock.Listener = listener
+	// A listener bound to port 0 got a new port.
+	sock.BoundAddr = netip.AddrPortFrom(sock.BoundAddr.Addr(), listener.Port())
 
 	return nil
 }
@@ -1494,7 +1506,7 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 		return nil
 
 	case sock.Listener != nil:
-		if err := writeAddr(rsa, len, netip.AddrPortFrom(netip.IPv4Unspecified(), 1)); err != 0 { // XXX TBD
+		if err := writeAddr(rsa, len, sock.BoundAddr); err != 0 {
 			return err
 		}
 		return nil

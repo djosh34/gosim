@@ -5,6 +5,8 @@ package behavior
 import (
 	"context"
 	_ "embed"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -144,4 +146,45 @@ func TestFatalUnlock(t *testing.T) {
 	}()
 	var mu sync.Mutex
 	mu.Unlock()
+}
+
+func TestOpenRoot(t *testing.T) {
+	f, err := os.Open("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Sync(); err != nil {
+		t.Error(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Error(err)
+	}
+	if info, err := os.Stat("/"); err != nil || !info.IsDir() {
+		t.Errorf("got %v %v", info, err)
+	}
+}
+
+func TestLoopbackListener(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	go func() {
+		c, err := l.Accept()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		c.Write([]byte("hi"))
+		c.Close()
+	}()
+	c, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := io.ReadAll(c)
+	if err != nil || string(b) != "hi" {
+		t.Errorf("got %q %v", b, err)
+	}
 }
