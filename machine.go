@@ -14,7 +14,9 @@ import (
 //
 // A Machine can be stopped and restarted. After a restart, a Machine has
 // a new, freshly-initialized set of global variables, but the same disk
-// and network address as before.
+// and network address as before. The exception is //go:embed variables: the
+// machines of a run share them, and they get their embedded values again only
+// at the start of a run.
 //
 // Once a machine's main function returns, the machine stops as
 // if called [Machine.Stop] with all writes flushed to disk and

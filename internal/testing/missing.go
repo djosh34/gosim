@@ -1,47 +1,55 @@
 package testing
 
+import "github.com/jellevandenhooff/gosim/gosimruntime"
+
 func AllocsPerRun(runs int, f func()) (avg float64) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.AllocsPerRun")
+	panic("unreachable")
 }
 
 func CoverMode() {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.CoverMode")
 }
 
 func Coverage() float64 {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.Coverage")
+	panic("unreachable")
 }
 
 func Init() {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.Init")
 }
 
 func Main(matchString func(pat, str string) (bool, error), tests []InternalTest, benchmarks []InternalBenchmark, examples []InternalExample) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.Main")
 }
 
 func RegisterCover(c Cover) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.RegisterCover")
 }
 
 func RunBenchmarks(matchString func(pat, str string) (bool, error), benchmarks []InternalBenchmark) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.RunBenchmarks")
 }
 
 func RunExamples(matchString func(pat, str string) (bool, error), examples []InternalExample) (ok bool) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.RunExamples")
+	panic("unreachable")
 }
 
 func RunTests(matchString func(pat, str string) (bool, error), tests []InternalTest) (ok bool) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.RunTests")
+	panic("unreachable")
 }
 
 func Testing() bool {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.Testing")
+	panic("unreachable")
 }
 
 func Verbose() bool {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.Verbose")
+	panic("unreachable")
 }
 
 type Cover struct {
@@ -81,7 +89,19 @@ type InternalTest struct {
 	F    func(*T)
 }
 
-type F struct{}
+// F is a fuzz target's argument. gosim does not run fuzz targets, so tests
+// that only compile with them still translate.
+type F struct {
+	common
+}
+
+func (f *F) Add(args ...any) {
+	gosimruntime.Unimplemented("testing.F.Add")
+}
+
+func (f *F) Fuzz(ff any) {
+	gosimruntime.Unimplemented("testing.F.Fuzz")
+}
 
 type PB struct{}
 

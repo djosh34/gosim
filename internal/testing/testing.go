@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"regexp"
 	"runtime"
 	"sync"
@@ -171,6 +172,13 @@ type common struct {
 	isParallel bool
 
 	cleanups []func()
+
+	// ctx is the test's Context, made when first asked for, and cancelCtx
+	// cancels it. ctxCanceled is set when the cleanups start, which cancels
+	// ctx, also when it is made later.
+	ctx         context.Context
+	cancelCtx   context.CancelFunc
+	ctxCanceled bool
 
 	cleanupStarted atomic.Bool // Registered cleanup callbacks have started to execute
 
@@ -623,6 +631,14 @@ func (c *common) runCleanup(ph panicHandling) (panicVal any) {
 		}
 	}()
 
+	c.mu.Lock()
+	c.ctxCanceled = true
+	cancelCtx := c.cancelCtx
+	c.mu.Unlock()
+	if cancelCtx != nil {
+		cancelCtx()
+	}
+
 	for {
 		var cleanup func()
 		c.mu.Lock()
@@ -639,8 +655,58 @@ func (c *common) runCleanup(ph panicHandling) (panicVal any) {
 	}
 }
 
+// Context returns a context that is canceled just before the test's cleanups
+// run.
+func (c *common) Context() context.Context {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ctx == nil {
+		c.ctx, c.cancelCtx = context.WithCancel(context.Background())
+		if c.ctxCanceled {
+			c.cancelCtx()
+		}
+	}
+	return c.ctx
+}
+
+// TempDir returns a new directory on the simulated machine's disk, which a
+// cleanup removes.
 func (c *common) TempDir() string {
-	panic("not implemented")
+	c.Helper()
+	if err := os.MkdirAll(os.TempDir(), 0o777); err != nil {
+		c.Fatalf("TempDir: %v", err)
+	}
+	dir, err := os.MkdirTemp("", "gosim-test")
+	if err != nil {
+		c.Fatalf("TempDir: %v", err)
+	}
+	c.Cleanup(func() {
+		if err := removeAll(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			c.Errorf("TempDir cleanup: %v", err)
+		}
+	})
+	return dir
+}
+
+// removeAll is os.RemoveAll with paths: the simulated file system does not
+// support the directory descriptors os.RemoveAll uses.
+func removeAll(path string) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		p := path + "/" + entry.Name()
+		if entry.IsDir() {
+			err = removeAll(p)
+		} else {
+			err = os.Remove(p)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return os.Remove(path)
 }
 
 func (c *common) private() {}
@@ -702,8 +768,25 @@ func (t *T) Parallel() {
 	t.lastRaceErrors.Store(int64(race.Errors()))
 }
 
+// Setenv sets an environment variable of the simulated machine until the end
+// of the test.
 func (t *T) Setenv(key, value string) {
-	panic("not implemented")
+	t.Helper()
+	prev, ok := os.LookupEnv(key)
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("cannot set environment variable: %v", err)
+	}
+	t.Cleanup(func() {
+		var err error
+		if ok {
+			err = os.Setenv(key, prev)
+		} else {
+			err = os.Unsetenv(key)
+		}
+		if err != nil {
+			t.Errorf("Setenv cleanup: %v", err)
+		}
+	})
 }
 
 type B struct {
@@ -711,7 +794,7 @@ type B struct {
 }
 
 func (b *B) Setenv(key, value string) {
-	panic("not implemented")
+	gosimruntime.Unimplemented("testing.B.Setenv")
 }
 
 func (t *T) Deadline() (time.Time, bool) {

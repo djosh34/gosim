@@ -29,6 +29,7 @@ func makeConstErr(err error) error {
 }
 
 var (
+	ErrFatal        = makeConstErr(errors.New("fatal error"))
 	ErrPaniced      = makeConstErr(errors.New("paniced"))
 	ErrAborted      = makeConstErr(errors.New("aborted"))
 	ErrMainReturned = makeConstErr(errors.New("main returned"))
@@ -113,6 +114,13 @@ type scheduler struct {
 	logger logger
 
 	abortErr error
+
+	// abortDetail says what ended the run with ErrUnimplemented or ErrFatal:
+	// the first hook passed to Unimplemented or message passed to Fatal.
+	abortDetail string
+
+	// artifacts holds the data passed to WriteArtifact, by name.
+	artifacts map[string][]byte
 
 	// race token given to background goroutines so they can read gs fields
 	globaltoken RaceToken
@@ -331,6 +339,7 @@ type internalRunResult struct {
 	Failed    bool
 	LogOutput []byte
 	Err       error
+	Artifacts map[string][]byte
 }
 
 func Seed() int64 {
@@ -372,6 +381,8 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	scheduler := newScheduler(seed, logger, checksummer, extraenv)
 	defer setgs(scheduler)()
 
+	resetEmbedded()
+
 	InitSteps()
 
 	defaultMachine := newMachine("")
@@ -391,6 +402,9 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	if runErr == ErrMainReturned {
 		runErr = nil
 	}
+	if runErr == ErrUnimplemented || runErr == ErrFatal {
+		runErr = fmt.Errorf("%w: %s", runErr, scheduler.abortDetail)
+	}
 	var checksum []byte
 	if enableChecksum {
 		checksummer.recordIntInt(checksumKeyRunFinished, 0, 0)
@@ -406,6 +420,7 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 		Failed:    runErr != nil, // TODO: get rid of Failed or Err?
 		LogOutput: capturedLog,
 		Err:       runErr,
+		Artifacts: scheduler.artifacts,
 	}
 }
 
@@ -503,6 +518,12 @@ type goroutine struct {
 
 	// per-goroutine syscall struct so we don't do allocs
 	syscallCache unsafe.Pointer // *Syscall
+
+	// fipsIndicator is the FIPS 140-3 service indicator of
+	// crypto/internal/fips140, kept per goroutine like the Go runtime does.
+	fipsIndicator uint8
+	// fipsBypassed is set inside crypto/fips140.WithoutEnforcement.
+	fipsBypassed bool
 }
 
 func newGoroutine(id int, parent *goroutine, spawnEventID int, fun func(), machine *Machine, token RaceToken) *goroutine {
@@ -568,6 +589,8 @@ func freeGoroutine(g *goroutine) {
 	g.parkPaniced = false
 	g.parkPanicTraceback = nil
 	g.parkPanicValue = ""
+	g.fipsIndicator = 0
+	g.fipsBypassed = false
 	g.entryFun = nil
 	g.entryToken = RaceToken{}
 	g.syscallCache = nil
@@ -941,6 +964,13 @@ func SetFinalizer(obj any, finalizer any) {
 	// invoke it ourselves?
 }
 
+// AddCleanup stands in for runtime.AddCleanup and never runs cleanup. The
+// garbage collector is not part of the simulation, and Go does not promise that
+// a cleanup runs.
+func AddCleanup[T, S any](ptr *T, cleanup func(S), arg S) runtime.Cleanup {
+	return runtime.Cleanup{}
+}
+
 func SetAbortError(err error) {
 	if _, ok := err.(constErr); !ok {
 		panic("SetAbortErr must be called with one of the predefined errors in this package")
@@ -958,6 +988,58 @@ func SetAbortError(err error) {
 }
 
 const GOOS = "linux"
+
+// FIPSIndicator returns the current goroutine's FIPS 140-3 service indicator.
+//
+// Marked go:norace to read fipsIndicator
+//
+//go:norace
+func FIPSIndicator() uint8 {
+	return getg().fipsIndicator
+}
+
+// SetFIPSIndicator sets the current goroutine's FIPS 140-3 service indicator.
+//
+// Marked go:norace to write fipsIndicator
+//
+//go:norace
+func SetFIPSIndicator(indicator uint8) {
+	getg().fipsIndicator = indicator
+}
+
+// FIPSBypassed reports whether the current goroutine runs inside
+// crypto/fips140.WithoutEnforcement.
+//
+// Marked go:norace to read fipsBypassed
+//
+//go:norace
+func FIPSBypassed() bool {
+	return getg().fipsBypassed
+}
+
+// SetFIPSBypassed sets whether the current goroutine runs inside
+// crypto/fips140.WithoutEnforcement.
+//
+// Marked go:norace to write fipsBypassed
+//
+//go:norace
+func SetFIPSBypassed(bypassed bool) {
+	getg().fipsBypassed = bypassed
+}
+
+// Fatal ends the current run with ErrFatal, like a fatal error in the Go
+// runtime such as unlocking an unlocked mutex. The translated program cannot
+// recover from it, and it never returns.
+func Fatal(msg string) {
+	getg().upcall(func() {
+		gs := gs.get()
+		gs.logger.slog.Error("fatal error", "msg", msg)
+		if gs.abortDetail == "" {
+			gs.abortDetail = msg
+		}
+	})
+	SetAbortError(ErrFatal)
+}
 
 // Marked go:norace to read ID
 //

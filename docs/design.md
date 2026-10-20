@@ -182,7 +182,7 @@ func newTimer(when, period int64, f func(arg any, seq uintptr, delay int64), arg
 ```
 
 which lives in `runtime/time.go`. For all such functions Gosim has hooks in the
-package github.com/jellevandenhooff/gosim/internals/hooks/go123. The hooks are
+package github.com/jellevandenhooff/gosim/internals/hooks/go127. The hooks are
 Go version specific because there are no API stability guarantees for these
 low-level unexported runtime functions. The hooks in Gosim are implemented as
 calls to the gosimruntime package.
@@ -306,7 +306,7 @@ func Syscall_pread(fd int, p []byte, offset int64) (n int, err error) {
 and finally linked into the rewritten standard library with a linkname
 
 ```go
-//go:linkname pread translated/github.com/jellevandenhooff/gosim/internal_/hooks/go123.Syscall_pread
+//go:linkname pread translated/github.com/jellevandenhooff/gosim/internal_/hooks/go127.Syscall_pread
 func pread(fd int, p []byte, offset int64) (n int, err error)
 ```
 

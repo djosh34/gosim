@@ -18,9 +18,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jellevandenhooff/gosim/cmd/gosim/internal/gosimviewer"
+	"github.com/jellevandenhooff/gosim/cmd/gosim/internal/translate"
 	"github.com/jellevandenhooff/gosim/internal/gosimtool"
-	"github.com/jellevandenhooff/gosim/internal/gosimviewer"
-	"github.com/jellevandenhooff/gosim/internal/translate"
 )
 
 //go:embed doc.go
@@ -130,6 +130,14 @@ func writeFileIfDifferent(b []byte, dst string, perm fs.FileMode) error {
 	return nil
 }
 
+// parseTags splits a comma-separated -tags flag.
+func parseTags(tags string) []string {
+	if tags == "" {
+		return nil
+	}
+	return strings.Split(tags, ",")
+}
+
 const toolsgoTemplate = `//go:build never
 
 package main
@@ -162,16 +170,24 @@ func main() {
 	case "translate":
 		translateflags := flag.NewFlagSet(commandName("translate"), flag.ExitOnError)
 		race := translateflags.Bool("race", false, "build in -race mode")
+		tags := translateflags.String("tags", "", "a comma-separated list of extra build tags")
+		unimplemented := translateflags.String("unimplemented", "", "path to a file to write the list of unimplemented hooks to; the list differs between GOARCH values")
 		translateflags.Parse(cmdArgs)
 
 		cfg.Race = *race
+		cfg.Tags = parseTags(*tags)
 
-		_, err := translate.Translate(&translate.TranslateInput{
+		output, err := translate.Translate(&translate.TranslateInput{
 			Packages: translateflags.Args(),
 			Cfg:      cfg,
 		})
 		if err != nil {
 			log.Fatal(err)
+		}
+		if *unimplemented != "" {
+			if err := writeUnimplemented(*unimplemented, output.Unimplemented); err != nil {
+				log.Fatal(err)
+			}
 		}
 
 	case "test":
@@ -183,9 +199,11 @@ func main() {
 		simtrace := testflags.String("simtrace", "", "set of a comma-separated traces to enable")
 		jsonlogout := testflags.String("jsonlogout", "", "path to a file to write json log to, for use with viewer")
 		seeds := testflags.String("seeds", "1", "a comma separated list of seeds and ranges to run, such as 1,2,10-100,99")
+		tags := testflags.String("tags", "", "a comma-separated list of extra build tags")
 		testflags.Parse(cmdArgs)
 
 		cfg.Race = *race
+		cfg.Tags = parseTags(*tags)
 
 		packages := testflags.Args()
 		if len(packages) == 0 {
@@ -259,9 +277,21 @@ func main() {
 
 		testflags := flag.NewFlagSet(commandName("build-tests"), flag.ExitOnError)
 		race := testflags.Bool("race", false, "build in -race mode")
+		tags := testflags.String("tags", "", "a comma-separated list of extra build tags")
+		allowed := testflags.String("allow-unimplemented", "", "path to a file of unimplemented hooks the test binaries may reach; with it, build-tests fails when a binary reaches any other")
 		testflags.Parse(cmdArgs)
 
 		cfg.Race = *race
+		cfg.Tags = parseTags(*tags)
+
+		var allowedHooks map[string]bool
+		if *allowed != "" {
+			var err error
+			allowedHooks, err = readHookNames(*allowed)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 
 		output, err := translate.Translate(&translate.TranslateInput{
 			Packages: testflags.Args(),
@@ -338,6 +368,12 @@ func main() {
 				src := filepath.Join(buildDir, binName)
 				dst := filepath.Join(dstDir, gosimtool.PreparedTestBinName(pkg))
 
+				if allowedHooks != nil {
+					if err := checkUnimplemented(src, output.Unimplemented, allowedHooks); err != nil {
+						log.Fatalf("%s: %s", pkg, err)
+					}
+				}
+
 				// skip unchanged so we keep the old modified timestamp
 				if err := copyFileIfChanged(src, dst, 0o755); err != nil {
 					log.Fatal(err)
@@ -370,6 +406,7 @@ func main() {
 
 		debugflags := flag.NewFlagSet(commandName("debug"), flag.ExitOnError)
 		race := debugflags.Bool("race", false, "build in -race mode")
+		tags := debugflags.String("tags", "", "a comma-separated list of extra build tags")
 		pkg := debugflags.String("package", "", "package path to debug")
 		test := debugflags.String("test", "", "full test name to debug")
 		seed := debugflags.Int("seed", 1, "seed to debug")
@@ -383,6 +420,7 @@ func main() {
 		}
 
 		cfg.Race = *race
+		cfg.Tags = parseTags(*tags)
 
 		output, err := translate.Translate(&translate.TranslateInput{
 			Packages: []string{*pkg},

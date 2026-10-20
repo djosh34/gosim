@@ -45,8 +45,9 @@ with the normal operating system. Gosim simulates:
     and partition machines.
 
   - Machines. Inside of Gosim a single Go test can create multiple machines which
-    are new instantiations of a Go program with their own global variables, their
-    own disk, and their own network address.
+    are new instantiations of a Go program with their own global variables
+    (except //go:embed variables, which they share), their own disk, and their
+    own network address.
 
 Gosim implements its simulation at the Go runtime and system call level,
 emulating Linux system calls. Gosim compiles all code with GOOS set to linux. To

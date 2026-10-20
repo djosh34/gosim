@@ -55,8 +55,8 @@ type Type interface {
 	OverflowFloat(x float64) bool
 	OverflowInt(x int64) bool
 	OverflowUint(x uint64) bool
-	// CanSeq() bool
-	// CanSeq2() bool
+	CanSeq() bool
+	CanSeq2() bool
 	isType()
 	// common() *abi.Type
 	// uncommon() *uncommonType
@@ -377,12 +377,13 @@ func PointerTo(t Type) Type {
 }
 
 func ChanOf(dir ChanDir, t Type) Type {
-	panic("missing")
-	// return wrapType(reflect.ChanOf(dir, t.(*typeImpl).inner))
+	gosimruntime.Unimplemented("reflect.ChanOf")
+	panic("unreachable")
 }
 
 func MapOf(key, elem Type) Type {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.MapOf")
+	panic("unreachable")
 }
 
 func FuncOf(in, out []Type, variadic bool) Type {
@@ -394,7 +395,8 @@ func SliceOf(t Type) Type {
 }
 
 func StructOf(fields []StructField) Type {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.StructOf")
+	panic("unreachable")
 }
 
 func ArrayOf(length int, elem Type) Type {

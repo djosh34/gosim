@@ -80,10 +80,6 @@ func (pd *PollDesc) Close() {
 	freePollDescs = append(freePollDescs, pd)
 }
 
-func (pd *PollDesc) WaitCanceled(mode int) {
-	panic("not implemented") // only used on windows
-}
-
 //go:norace
 func (pd *PollDesc) Reset(mode int) int {
 	// called before wait

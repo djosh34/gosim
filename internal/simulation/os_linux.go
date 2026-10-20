@@ -318,6 +318,19 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	// just get rid of this
 	flags &= ^syscall.O_CLOEXEC
 
+	// O_DIRECTORY fails unless path is a directory. Go's os package sets it
+	// when it opens a directory to read it.
+	if flags&syscall.O_DIRECTORY != 0 {
+		flags &= ^syscall.O_DIRECTORY
+		stat, err := l.machine.filesystem.Stat(dirInode, path)
+		if err != nil {
+			return 0, err
+		}
+		if !stat.IsDir {
+			return 0, syscall.ENOTDIR
+		}
+	}
+
 	// TODO: some rules about paths; component length; total length; allow characters?
 	// TODO: check mode
 
@@ -395,6 +408,10 @@ var openatFlags = &gosimlog.BitflagFormatter{
 		{
 			Value: syscall.O_CLOEXEC,
 			Name:  "O_CLOEXEC",
+		},
+		{
+			Value: syscall.O_DIRECTORY,
+			Name:  "O_DIRECTORY",
 		},
 	},
 }
@@ -1097,8 +1114,18 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 		}
 
 	case *Socket:
-		// TBD
-		// XXX: wowwwwwww we should get this one. better send a close!
+		// Closing a socket closes its stream or listener, so the peer
+		// sees the end of the stream.
+		if fdInternal.Stream != nil {
+			if err := l.machine.netstack.StreamClose(fdInternal.Stream); err != nil && err != network.ErrStreamClosed {
+				return syscall.EBADFD
+			}
+		}
+		if fdInternal.Listener != nil {
+			if err := l.machine.netstack.CloseListener(fdInternal.Listener); err != nil && err != network.ErrListenerClosed {
+				return syscall.EBADFD
+			}
+		}
 
 	default:
 		return syscall.EBADFD
@@ -1272,6 +1299,8 @@ func (l *LinuxOS) SysListen(fd, backlog int, invocation *syscallabi.Syscall) err
 		return syscall.EINVAL
 	}
 	sock.Listener = listener
+	// A listener bound to port 0 got a new port.
+	sock.BoundAddr = netip.AddrPortFrom(sock.BoundAddr.Addr(), listener.Port())
 
 	return nil
 }
@@ -1477,7 +1506,7 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 		return nil
 
 	case sock.Listener != nil:
-		if err := writeAddr(rsa, len, netip.AddrPortFrom(netip.IPv4Unspecified(), 1)); err != 0 { // XXX TBD
+		if err := writeAddr(rsa, len, sock.BoundAddr); err != 0 {
 			return err
 		}
 		return nil

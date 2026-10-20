@@ -1,6 +1,47 @@
 # Gosim: Simulation testing for Go
 [![Go Reference](https://pkg.go.dev/badge/github.com/jellevandenhooff/gosim.svg)](https://pkg.go.dev/github.com/jellevandenhooff/gosim)
 
+> **This is djosh34/gosim**, a port of
+> [jellevandenhooff/gosim](https://github.com/jellevandenhooff/gosim) to
+> Go 1.27.2, made for [tigerstore](https://github.com/djosh34/tigerstore)'s
+> simulator. It keeps upstream's history, its MIT license and its module path,
+> so a user pins it with a `replace` directive:
+>
+> ```
+> require github.com/jellevandenhooff/gosim v0.0.0-<date>-<commit>
+> replace github.com/jellevandenhooff/gosim => github.com/djosh34/gosim v0.0.0-<date>-<commit>
+> ```
+>
+> What differs from upstream:
+>
+> - It supports Go 1.27.2 only. A newer Go needs its hooks checked again
+>   (`TestHookSignatures` in `cmd/gosim/internal/translate` checks every
+>   hook's signature against the Go source it replaces).
+> - The command, `cmd/gosim`, is a module of its own, so that its dependencies
+>   do not raise the versions in the user's `go.mod`. Build it from a module
+>   that replaces both `github.com/jellevandenhooff/gosim` and
+>   `github.com/jellevandenhooff/gosim/cmd/gosim` with this repository.
+> - Every hook gosim does not implement fails through one function,
+>   `gosimruntime.Unimplemented(name)`, which ends the run with
+>   `gosimruntime.ErrUnimplemented` and the hook's name. The translator gives
+>   every function it has no implementation for such a body, where upstream
+>   stopped. `gosim translate -unimplemented FILE` writes the list of them; the
+>   list differs between architectures. `gosim build-tests -allow-unimplemented
+>   FILE` fails when a test binary can reach a hook that FILE does not list.
+> - `gosim translate`, `test` and `build-tests` take `-tags`. Translation
+>   always sets `purego`, so crypto uses its Go code instead of assembly.
+> - A simulated program can pass data to the test that runs it with
+>   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
+>   `MetaT.RunQuiet` runs a test without logging its output.
+> - Weak pointers stay strong and cleanups never run, since the garbage
+>   collector is not part of the simulation.
+> - `sync.Map` hashes every key to 0, so its order depends only on the order
+>   of the stores, not on pointer addresses; each operation takes time linear
+>   in the map's size. `hash/maphash` hashes with FNV-1a, and
+>   `maphash.Comparable` is unimplemented.
+> - Every run starts with the embedded values of `//go:embed` variables; the
+>   machines of one run share them.
+
 Gosim is a simulation testing framework that aims to make it easier to write
 reliable distributed systems code in go. Gosim takes standard go programs and
 tests and runs them with a simulated network, filesystem, multiple machines, and

@@ -19,6 +19,7 @@ const (
 	PacketKindStreamData                     // uses Offset, Count
 	PacketKindStreamAck                      // uses Offset
 	PacketKindStreamWindow                   // uses Count
+	PacketKindStreamFin                      // uses Offset; the sender closed the stream after sending Offset bytes
 )
 
 // XXX: for connId, add a secret extra field so we can gracefully handle delayed
@@ -121,10 +122,19 @@ func NewStack() *Stack {
 	return b
 }
 
-func (n *Stack) allocatePort() uint16 {
-	port := n.nextPort
-	n.nextPort++
-	return port
+// ErrNoFreePort means every port has a listener.
+var ErrNoFreePort = errors.New("no free port")
+
+// allocatePort returns a port no listener uses.
+func (n *Stack) allocatePort() (uint16, error) {
+	for range 1 << 16 {
+		port := n.nextPort
+		n.nextPort++
+		if _, ok := n.listeners[port]; !ok {
+			return port, nil
+		}
+	}
+	return 0, ErrNoFreePort
 }
 
 func (b *Stack) processIncomingPacket(packet *Packet) {
@@ -208,13 +218,17 @@ func (b *Stack) processIncomingPacket(packet *Packet) {
 
 		stream.processIncomingPacket(b, packet)
 
-	case PacketKindStreamClose:
+	case PacketKindStreamClose, PacketKindStreamFin:
 		id := packet.ConnId.Flip()
 
 		stream, ok := b.streams[id]
 		if !ok {
 			break // maybe send go away instead?
 		}
+
+		// After a close by the peer, reads end with EOF instead of an
+		// error, if all the data the peer sent arrived.
+		stream.finished = packet.Kind == PacketKindStreamFin && packet.Offset == stream.recvPos
 
 		if err := b.closeStream(stream, false); err != nil {
 			// XXX
@@ -241,10 +255,17 @@ type Listener struct {
 
 var ErrPortAlreadyInUse = errors.New("port already in use")
 
+// OpenListener listens on port, or on a new port when port is 0.
 func (n *Stack) OpenListener(port uint16) (*Listener, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	if port == 0 {
+		var err error
+		if port, err = n.allocatePort(); err != nil {
+			return nil, err
+		}
+	}
 	if _, ok := n.listeners[port]; ok {
 		return nil, ErrPortAlreadyInUse
 	}
@@ -259,6 +280,11 @@ func (n *Stack) OpenListener(port uint16) (*Listener, error) {
 	n.listeners[port] = l
 
 	return l, nil
+}
+
+// Port returns the port the listener listens on.
+func (l *Listener) Port() uint16 {
+	return l.port
 }
 
 var ErrListenerClosed = errors.New("listener closed")
@@ -304,8 +330,11 @@ func (n *Stack) CloseListener(listener *Listener) error {
 
 	l.closed = true
 
-	for i := 0; i < l.incomingCount; i++ {
-		n.closeStream(l.incoming[l.incomingPos], true)
+	for l.incomingCount > 0 {
+		// A pending stream the peer already closed needs no close.
+		if s := l.incoming[l.incomingPos]; !s.closed {
+			n.closeStream(s, true)
+		}
 		l.incoming[l.incomingPos] = nil
 		l.incomingPos++
 		if l.incomingPos == len(l.incoming) {
@@ -413,6 +442,8 @@ type Stream struct {
 
 	opened bool
 	closed bool
+	// finished is set when the peer closed the stream.
+	finished bool
 
 	openFailedTimer *time.Timer
 	ackFailedTimer  *time.Timer
@@ -505,7 +536,15 @@ func (n *Stack) OpenStream(addr netip.AddrPort) (*Stream, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	localPort := n.allocatePort()
+	// A loopback address is the machine itself.
+	if addr.Addr().IsLoopback() || addr.Addr().IsUnspecified() {
+		addr = netip.AddrPortFrom(n.endpoint.Addr(), addr.Port())
+	}
+
+	localPort, err := n.allocatePort()
+	if err != nil {
+		return nil, err
+	}
 	id := ConnId{
 		Hosts: HostPair{
 			SourceHost: n.endpoint.Addr(),
@@ -556,7 +595,10 @@ func (n *Stack) StreamClose(stream *Stream) error {
 		return ErrStreamClosed
 	}
 
-	if err := n.closeStream(stream, true); err != nil {
+	fin := allocPacket(PacketKindStreamFin, stream.id)
+	fin.Offset = stream.sendPos
+	n.endpoint.Send(fin)
+	if err := n.closeStream(stream, false); err != nil {
 		return err
 	}
 
@@ -654,6 +696,9 @@ func (n *Stack) StreamRecv(s *Stream, data syscallabi.ByteSliceView) (int, error
 	defer n.mu.Unlock()
 
 	if s.incomingAvailable == 0 {
+		if s.finished {
+			return 0, nil
+		}
 		if s.closed {
 			return 0, ErrStreamClosed
 		}

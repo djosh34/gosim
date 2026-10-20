@@ -28,12 +28,17 @@ type BuildConfig struct {
 	GOOS   string
 	GOARCH string
 	Race   bool
+	// Tags are extra build tags, on top of the sim tag translate always sets.
+	Tags []string
 }
 
 func (b BuildConfig) AsDirname() string {
 	name := fmt.Sprintf("%s_%s", b.GOOS, b.GOARCH)
 	if b.Race {
 		name += "_race"
+	}
+	for _, tag := range b.Tags {
+		name += "_" + tag
 	}
 	return name
 }
@@ -42,6 +47,19 @@ type TranslateOutput struct {
 	RootOutputDir string
 	Packages      []string                        // TODO: combine all this in a struct? also include input name?
 	Deps          map[string]map[string]time.Time // pkg -> path -> time
+	// Unimplemented lists, sorted, the hooks in the translated code that
+	// call gosimruntime.Unimplemented.
+	Unimplemented []UnimplementedHook
+}
+
+// An UnimplementedHook is a function in translated code that fails through
+// gosimruntime.Unimplemented.
+type UnimplementedHook struct {
+	// Name is the name passed to gosimruntime.Unimplemented, such as
+	// "internal/cpu.getisar1".
+	Name string
+	// Symbol is the function's symbol in the compiled test binary.
+	Symbol string
 }
 
 func FindGoMod() (string, *modfile.File, error) {
@@ -187,16 +205,25 @@ var (
 	buildOnce   = make(map[string]*sync.Once)
 )
 
-func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
+func GetPathForPrecompiledTestBinary(t *testing.T, pkg string, tags []string) string {
 	didBuild := false
+
+	// TODO: test this race stuff somehow. make test output if race is enabled?
+	cfg := BuildConfig{
+		GOOS:   "linux",
+		GOARCH: runtime.GOARCH,
+		Race:   race.Enabled,
+		Tags:   tags,
+	}
 
 	if isUncachedTestRun() {
 		// TODO: figure out if we should pass -race or not?
 		buildOnceMu.Lock()
-		once, ok := buildOnce[pkg]
+		key := cfg.AsDirname() + " " + pkg
+		once, ok := buildOnce[key]
 		if !ok {
 			once = new(sync.Once)
-			buildOnce[pkg] = once
+			buildOnce[key] = once
 		}
 		buildOnceMu.Unlock()
 
@@ -204,6 +231,8 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
 		once.Do(func() {
 			var name string
 			var flags []string
+			// The command is a module of its own, so go run works only
+			// in a module that requires it; GOSIMTOOL names a built one.
 			if prebuilt, ok := os.LookupEnv("GOSIMTOOL"); ok {
 				name = prebuilt
 			} else {
@@ -214,12 +243,15 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
 			if race.Enabled {
 				flags = append(flags, "-race")
 			}
+			if len(tags) > 0 {
+				flags = append(flags, "-tags", strings.Join(tags, ","))
+			}
 			flags = append(flags, pkg)
 			cmd := exec.Command(name, flags...)
 			t.Logf("looks like an uncached test run... running `%s`", strings.Join(cmd.Args, " "))
 			out, err := cmd.CombinedOutput()
 			if err != nil {
-				t.Fatalf("gosim build-tests failed: %s\n\n%s", err, string(out))
+				t.Fatalf("gosim build-tests failed: %s\n\n%s\nSet GOSIMTOOL to the path of a gosim binary to use it instead of go run.", err, string(out))
 			}
 		})
 	}
@@ -227,13 +259,6 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
 	goModDir, err := FindGoModDir()
 	if err != nil {
 		t.Fatalf("Could not find containing go module: %s", err)
-	}
-
-	// TODO: test this race stuff somehow. make test output if race is enabled?
-	cfg := BuildConfig{
-		GOOS:   "linux",
-		GOARCH: runtime.GOARCH,
-		Race:   race.Enabled,
 	}
 
 	outDir := filepath.Join(goModDir, OutputDirectory, "metatest", cfg.AsDirname())

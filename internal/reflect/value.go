@@ -88,7 +88,8 @@ type SelectCase struct {
 }
 
 func Select(cases []SelectCase) (chosen int, recv Value, recvOK bool) {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.Select")
+	panic("unreachable")
 }
 
 func MakeSlice(typ Type, len, cap int) Value {
@@ -96,7 +97,8 @@ func MakeSlice(typ Type, len, cap int) Value {
 }
 
 func MakeChan(typ Type, buffer int) Value {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.MakeChan")
+	panic("unreachable")
 }
 
 func getDecriptor(typ Type) gosimruntime.ReflectMapType {
@@ -324,14 +326,18 @@ func (iter *MapIter) Next() bool {
 	return iter.inner.Next()
 }
 
+// zeroIter is the iterator of a MapIter reset to the zero Value. Like
+// reflect's, its Key and Value panic.
 type zeroIter struct{}
 
 func (z zeroIter) Value() reflect.Value {
-	panic("missing")
+	var iter reflect.MapIter
+	return iter.Value()
 }
 
 func (z zeroIter) Key() reflect.Value {
-	panic("missing")
+	var iter reflect.MapIter
+	return iter.Key()
 }
 
 func (z zeroIter) Next() bool {
@@ -416,11 +422,12 @@ func (v Value) Pointer() uintptr {
 }
 
 func (v Value) Recv() (x Value, ok bool) {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.Value.Recv")
+	panic("unreachable")
 }
 
 func (v Value) Send(x Value) {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.Value.Send")
 }
 
 func (v Value) Set(x Value) {
@@ -484,11 +491,13 @@ func (v Value) String() string {
 }
 
 func (v Value) TryRecv() (x Value, ok bool) {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.Value.TryRecv")
+	panic("unreachable")
 }
 
 func (v Value) TrySend(x Value) bool {
-	panic("missing")
+	gosimruntime.Unimplemented("reflect.Value.TrySend")
+	panic("unreachable")
 }
 
 func (v Value) Type() Type {

@@ -40,6 +40,8 @@ type RunResult struct {
 	Failed    bool
 	LogOutput []byte
 	Err       string // TODO: reconsider this type?
+	// Artifacts holds the data the run passed to gosim.WriteArtifact, by name.
+	Artifacts map[string][]byte
 }
 
 // A MetaT runs gosim tests for a given package. It can run tests with various
@@ -158,23 +160,15 @@ func (r *MetaT) RunAllTests(t *testing.T) {
 func (r *MetaT) Run(t *testing.T, config *RunConfig) (*RunResult, error) {
 	t.Helper()
 
-	// TODO: Handle concurrent runs (lock?)
-	// TODO: Stop or restart process on error?
+	result, err := r.RunQuiet(config)
+	if err != nil {
+		return nil, err
+	}
 
 	b := new(bytes.Buffer)
 
 	// TODO: include "gosim test ..." line?
 	fmt.Fprintf(b, "\n> running %s [seed=%d]\n", config.Test, config.Seed)
-
-	if err := r.w.Encode(config); err != nil {
-		return nil, err
-	}
-
-	var result RunResult
-	if err := r.r.Decode(&result); err != nil {
-		// TODO: Print results that fail to decode
-		return nil, err
-	}
 
 	w := prettylog.NewWriter(b)
 
@@ -190,6 +184,23 @@ func (r *MetaT) Run(t *testing.T, config *RunConfig) (*RunResult, error) {
 	}
 	t.Log(b.String())
 
+	return result, nil
+}
+
+// RunQuiet runs a test like Run, without logging its output.
+func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
+	// TODO: Handle concurrent runs (lock?)
+	// TODO: Stop or restart process on error?
+
+	if err := r.w.Encode(config); err != nil {
+		return nil, err
+	}
+
+	var result RunResult
+	if err := r.r.Decode(&result); err != nil {
+		// TODO: Print results that fail to decode
+		return nil, err
+	}
 	return &result, nil
 }
 
@@ -198,8 +209,9 @@ var (
 	runnerMap   = make(map[string]*MetaT)
 )
 
-// ForOtherPackage retursn a *MetaT for the specified package.
-func ForOtherPackage(t *testing.T, pkg string) *MetaT {
+// ForOtherPackage returns a *MetaT for the specified package, translated with
+// the given extra build tags (gosim build-tests -tags).
+func ForOtherPackage(t *testing.T, pkg string, tags ...string) *MetaT {
 	if gosimruntime.IsSim() {
 		t.Fatalf("metatest cannot be used from within gosim")
 	}
@@ -207,17 +219,18 @@ func ForOtherPackage(t *testing.T, pkg string) *MetaT {
 	runnerMapMu.Lock()
 	defer runnerMapMu.Unlock()
 
-	runner, ok := runnerMap[pkg]
+	key := strings.Join(append([]string{pkg}, tags...), " ")
+	runner, ok := runnerMap[key]
 	if ok {
 		return runner
 	}
 
-	path := gosimtool.GetPathForPrecompiledTestBinary(t, pkg)
+	path := gosimtool.GetPathForPrecompiledTestBinary(t, pkg, tags)
 	runner, err := newRunner(path)
 	if err != nil {
 		t.Fatalf("failed to run test binary: %s", err)
 	}
-	runnerMap[pkg] = runner
+	runnerMap[key] = runner
 	return runner
 }
 
