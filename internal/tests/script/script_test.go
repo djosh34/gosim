@@ -37,15 +37,11 @@ func TestScript(t *testing.T) {
 		// put a fake go.mod in the work directory
 		// this include a copy of the gosim module (not the entire module because we want to minimize test dependencies)
 		if err := gosimtool.MakeGoModForTest(extractedModDir, e.WorkDir, []string{
-			"github.com/dave/dst",
 			"github.com/google/go-cmp",
 			"github.com/mattn/go-isatty",
-			"github.com/mattn/go-sqlite3",
 			"golang.org/x/mod",
 			"golang.org/x/sync",
 			"golang.org/x/sys",
-			"golang.org/x/tools",
-			"mvdan.cc/gofumpt",
 		}); err != nil {
 			return err
 		}

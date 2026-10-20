@@ -23,7 +23,7 @@ tasks:
   gosim-tool:
     run: once
     cmds:
-      - mkdir -p ./.gosim && go build -o ./.gosim/gosimtool ./cmd/gosim
+      - mkdir -p ./.gosim && go build -C cmd/gosim -o ../../.gosim/gosimtool .
 
   gosim-prepare-selftest:
     run: once
@@ -36,6 +36,7 @@ tasks:
     cmds:
       - "{{.GOSIM}} build-tests {{.SIMPACKAGES}}"
       - go test -ldflags=-checklinkname=0 -tags=linkname ./...
+      - go test -C cmd/gosim ./...
     deps:
       - gosim-tool
       - gosim-prepare-selftest
@@ -45,6 +46,7 @@ tasks:
       - "{{.GOSIM}} build-tests -race {{.SIMPACKAGES}} ./internal/tests/race/testdata"
       # todo: get rid of this janky thing???
       - go test -ldflags=-checklinkname=0 -tags=linkname -race ./...
+      - go test -C cmd/gosim -race ./...
     deps:
       - gosim-tool
       - gosim-prepare-selftest

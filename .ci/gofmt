@@ -1,9 +1,11 @@
 #!/bin/bash
 # gofmt checks that code is formatted with gofumpt and sorted inputs
 
-gofiles=$(find . -name "*.go" -and -not -ipath "./.gosim/*" -exec sh -c 'head -3 {} | grep -q "DO NOT EDIT." || echo {}' \;)
-goimports="go run golang.org/x/tools/cmd/goimports -local=github.com/jellevandenhooff/gosim -format-only"
-gofumpt="go run mvdan.cc/gofumpt"
+# The copies of standard library files in _overlay keep Go's formatting.
+gofiles=$(find "$PWD" -name "*.go" -and -not -ipath "*/.gosim/*" -and -not -ipath "*/_overlay/*" -exec sh -c 'head -3 {} | grep -q "DO NOT EDIT." || echo {}' \;)
+# The tools are pinned in the cmd/gosim module.
+goimports="go run -C cmd/gosim golang.org/x/tools/cmd/goimports -local=github.com/jellevandenhooff/gosim -format-only"
+gofumpt="go run -C cmd/gosim mvdan.cc/gofumpt"
 
 if [[ $1 == "check" ]]; then
     echo goimports
