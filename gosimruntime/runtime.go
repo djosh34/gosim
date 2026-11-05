@@ -119,8 +119,10 @@ type scheduler struct {
 	// the first hook passed to Unimplemented or message passed to Fatal.
 	abortDetail string
 
-	// artifacts holds the data passed to WriteArtifact, by name.
+	// artifacts holds the data passed to WriteArtifact, by name, and
+	// logBuffer the run's log, if it captures it.
 	artifacts map[string][]byte
+	logBuffer *bytes.Buffer
 
 	// race token given to background goroutines so they can read gs fields
 	globaltoken RaceToken
@@ -379,6 +381,7 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	}
 
 	scheduler := newScheduler(seed, logger, checksummer, extraenv)
+	scheduler.logBuffer = logBuffer
 	defer setgs(scheduler)()
 
 	resetEmbedded()

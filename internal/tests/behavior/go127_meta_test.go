@@ -3,6 +3,8 @@
 package behavior_test
 
 import (
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -39,11 +41,15 @@ func TestWallLimit(t *testing.T) {
 
 func TestWallKill(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
-	if _, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestWallKill", Seed: 1, ExtraEnv: []string{"TESTINGWALL=1"}, WallKill: 200 * time.Millisecond}); err == nil {
-		t.Fatal("a run that never yields ended without an error")
+	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestWallKill", Seed: 1, ExtraEnv: []string{"TESTINGWALL=1"}, WallKill: 200 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !run.Failed || !run.Ended || string(run.Artifacts["before.txt"]) != "saved" || !strings.Contains(string(run.Artifacts["gosim-stacks.txt"]), "TestWallKill") || !strings.Contains(run.Err, "TestWallKill with seed 1") {
+		t.Errorf("got failed %v, ended %v, err %q, artifacts %q", run.Failed, run.Ended, run.Err, slices.Sorted(maps.Keys(run.Artifacts)))
 	}
 	// The next run starts a new test binary.
-	run, err := metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1})
+	run, err = metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1})
 	if err != nil || run.Failed || string(run.Artifacts["artifact.txt"]) != "hello" {
 		t.Errorf("the next run: %v, %+v", err, run)
 	}

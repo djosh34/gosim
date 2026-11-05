@@ -1,9 +1,10 @@
 package gosimruntime
 
 import (
-	"fmt"
-	"os"
+	"bytes"
+	"maps"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -13,8 +14,8 @@ import (
 // points of its own choosing, and stops itself, as with any failure it
 // reports: real time never changes what a run does before its limit. A run
 // whose goroutine never yields gets to no such point, so a second limit
-// (RunConfig.WallKill) ends the whole process, after it wrote every
-// goroutine's stack to stderr.
+// (RunConfig.WallKill) ends the whole test binary, after it reported the
+// run with what it saved and logged so far and every goroutine's stack.
 
 // wallDeadline is when the current run's limit of real time passes, as
 // Unix nanoseconds, or 0 for no limit.
@@ -40,24 +41,51 @@ func Stacks() []byte {
 	}
 }
 
-// startWallLimit sets the limits of real time of a run that starts now. It
-// returns a function that clears them once the run ended.
-func startWallLimit(limit, kill time.Duration) (stop func()) {
-	now := time.Now()
+// startWallLimit sets the limits of real time of a run that starts now.
+// When kill passes, kill calls ended, which must not return, as the run
+// goes on in another goroutine. The returned stop clears the limits once
+// the run ended; it waits for an ended that already started, so that no
+// later run starts before the binary ends.
+func startWallLimit(limit, kill time.Duration, ended func()) (stop func()) {
 	if limit > 0 {
-		wallDeadline.Store(now.Add(limit).UnixNano())
+		wallDeadline.Store(time.Now().Add(limit).UnixNano())
 	}
+	var mu sync.Mutex
+	stopped := false
 	var timer *time.Timer
 	if kill > 0 {
 		timer = time.AfterFunc(kill, func() {
-			fmt.Fprintf(os.Stderr, "gosim: the run passed its limit of %v of real time; the stack of every goroutine:\n%s\n", kill, Stacks())
-			os.Exit(2)
+			mu.Lock()
+			if !stopped {
+				ended()
+			}
+			mu.Unlock()
 		})
 	}
 	return func() {
+		mu.Lock()
+		stopped = true
+		mu.Unlock()
 		wallDeadline.Store(0)
 		if timer != nil {
 			timer.Stop()
 		}
 	}
+}
+
+// soFar returns what the current run saved with WriteArtifact and logged
+// so far, for the report of a run that never yields. The run's goroutine
+// may still change them; it is the report of a run that is stuck.
+//
+//go:norace
+func soFar() (map[string][]byte, []byte) {
+	s := gs.get()
+	if s == nil {
+		return nil, nil
+	}
+	var log []byte
+	if s.logBuffer != nil {
+		log = bytes.Clone(s.logBuffer.Bytes())
+	}
+	return maps.Clone(s.artifacts), log
 }

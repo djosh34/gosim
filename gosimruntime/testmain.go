@@ -52,6 +52,8 @@ type runResult struct {
 	LogOutput []byte
 	Err       string // TODO: reconsider this type?
 	Artifacts map[string][]byte
+	// Ended is set when the test binary ends after this result.
+	Ended bool
 }
 
 type Runtime interface {
@@ -222,7 +224,27 @@ func TestMain(rt Runtime) {
 			continue
 		}
 
-		stopWall := startWallLimit(req.WallLimit, req.WallKill)
+		// A run that passed WallKill is reported with what it saved and
+		// logged so far and every goroutine's stack, and the binary ends.
+		stopWall := startWallLimit(req.WallLimit, req.WallKill, func() {
+			artifacts, logOutput := soFar()
+			if artifacts == nil {
+				artifacts = map[string][]byte{}
+			}
+			artifacts["gosim-stacks.txt"] = Stacks()
+			metaResult := runResult{
+				Seed:      seed,
+				Failed:    true,
+				Err:       fmt.Sprintf("the run of %s with seed %d passed its limit of %v of real time without yielding; the stack of every goroutine is in the artifact gosim-stacks.txt", req.Test, seed, req.WallKill),
+				LogOutput: logOutput,
+				Artifacts: artifacts,
+				Ended:     true,
+			}
+			if err := out.Encode(metaResult); err != nil {
+				log.Print(err)
+			}
+			os.Exit(2)
+		})
 		result := run(func() {
 			// TODO: add an entrypoint that takes a single test?
 			// TODO: fail gracefully with non-existent tests?

@@ -3,6 +3,7 @@ package metatesting
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -34,10 +35,10 @@ type RunConfig struct {
 	Simtrace string
 	// WallLimit, if set, is the run's limit of real time, which the
 	// simulation reads with gosim.WallLimitPassed. WallKill, if set,
-	// ends the test binary after that much real time, with every
-	// goroutine's stack on its stderr, for a run that never gets to read
-	// WallLimit; RunQuiet then returns an error, and the next run starts
-	// a new test binary.
+	// ends the test binary after that much real time, for a run that never
+	// gets to read WallLimit: the run fails with what it saved and logged
+	// so far, every goroutine's stack in the artifact gosim-stacks.txt,
+	// and Ended set, and the next run starts a new test binary.
 	WallLimit time.Duration
 	WallKill  time.Duration
 }
@@ -51,6 +52,9 @@ type RunResult struct {
 	Err       string // TODO: reconsider this type?
 	// Artifacts holds the data the run passed to gosim.WriteArtifact, by name.
 	Artifacts map[string][]byte
+	// Ended is set when the test binary ended after this result, as after
+	// RunConfig.WallKill; the next run starts a new one.
+	Ended bool
 }
 
 // A MetaT runs gosim tests for a given package. It can run tests with various
@@ -68,6 +72,8 @@ type MetaT struct {
 	key  string
 	dead error
 }
+
+var errEnded = errors.New("the test binary ended after its run passed RunConfig.WallKill")
 
 // fail ends the MetaT's test binary after err, and keeps ForOtherPackage
 // from handing out the MetaT again.
@@ -233,6 +239,9 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 	if err := r.r.Decode(&result); err != nil {
 		// TODO: Print results that fail to decode
 		return nil, r.fail(err)
+	}
+	if result.Ended {
+		r.fail(errEnded)
 	}
 	return &result, nil
 }

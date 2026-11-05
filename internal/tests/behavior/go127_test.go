@@ -139,12 +139,13 @@ func TestWallLimit(t *testing.T) {
 	gosim.WriteArtifact("stacks", gosim.Stacks())
 }
 
-// TestWallKill never yields, so only its second limit of real time ends
-// it.
+// TestWallKill saves an artifact, then never yields, so only its second
+// limit of real time ends it.
 func TestWallKill(t *testing.T) {
 	if os.Getenv("TESTINGWALL") != "1" {
 		t.Skip()
 	}
+	gosim.WriteArtifact("before.txt", []byte("saved"))
 	for n := 0; ; n++ {
 		_ = n
 	}
