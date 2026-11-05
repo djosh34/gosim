@@ -50,8 +50,8 @@ func TestWallStopBeforeKill(t *testing.T) {
 // run goes on saving and logging, as a kill does.
 func TestSoFarWhileWriting(t *testing.T) {
 	s := &scheduler{logBuffer: &lockedBuffer{}}
-	defer gs.set(gs.get())
-	gs.set(s)
+	setKillable(s)
+	defer setKillable(nil)
 	stop, writing := make(chan struct{}), make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Go(func() {

@@ -74,8 +74,20 @@ func startWallLimit(limit, kill time.Duration, ended func()) (stop func()) {
 }
 
 // soFarMu guards the artifacts and the log of the current run, which a
-// kill reads while the run may still write them.
-var soFarMu sync.Mutex
+// kill reads while the run may still write them, and killable, the
+// scheduler of the current run, which run sets under it so that a kill
+// sees the scheduler run made.
+var (
+	soFarMu  sync.Mutex
+	killable *scheduler
+)
+
+// setKillable makes s the run whose artifacts and log a kill reports.
+func setKillable(s *scheduler) {
+	soFarMu.Lock()
+	defer soFarMu.Unlock()
+	killable = s
+}
 
 // lockedBuffer is a run's log, written under soFarMu.
 type lockedBuffer struct {
@@ -98,15 +110,15 @@ func (b *lockedBuffer) bytes() []byte {
 // soFar returns what the current run saved with WriteArtifact and logged
 // so far, for the report of a run that never yields.
 func soFar() (map[string][]byte, []byte) {
-	s := gs.get()
+	soFarMu.Lock()
+	defer soFarMu.Unlock()
+	s := killable
 	if s == nil {
 		return nil, nil
 	}
 	var log []byte
 	if s.logBuffer != nil {
-		log = s.logBuffer.bytes()
+		log = bytes.Clone(s.logBuffer.buf.Bytes())
 	}
-	soFarMu.Lock()
-	defer soFarMu.Unlock()
 	return maps.Clone(s.artifacts), log
 }

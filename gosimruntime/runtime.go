@@ -383,6 +383,8 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 
 	scheduler := newScheduler(seed, logger, checksummer, extraenv)
 	scheduler.logBuffer = logBuffer
+	setKillable(scheduler)
+	defer setKillable(nil)
 	defer setgs(scheduler)()
 
 	resetEmbedded()
@@ -424,7 +426,7 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 		Failed:    runErr != nil, // TODO: get rid of Failed or Err?
 		LogOutput: capturedLog,
 		Err:       runErr,
-		Artifacts: scheduler.artifacts,
+		Artifacts: scheduler.takeArtifacts(),
 	}
 }
 
