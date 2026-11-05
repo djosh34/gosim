@@ -36,8 +36,9 @@
 > - A run can have limits of real time (`metatesting.RunConfig.WallLimit` and
 >   `WallKill`). The simulation reads the first with `gosim.WallLimitPassed`
 >   and stops itself, with `gosim.Stacks` for its report. The second ends a
->   test binary whose run never yields, with every goroutine's stack on its
->   stderr; the next run then starts a new binary.
+>   test binary whose run never yields: the run fails with what it saved and
+>   logged so far and every goroutine's stack (`gosim-stacks.txt`), and the
+>   next run starts a new binary.
 > - A run copies its environment into a map, and each insert into a map of
 >   more than 4 entries draws from the run's random stream, so the number of
 >   `ExtraEnv` entries changes the run; pass the same variables every time.
