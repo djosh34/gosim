@@ -116,9 +116,11 @@ func (b *lockedBuffer) bytes() []byte {
 // soFar returns what the current run saved with WriteArtifact and logged
 // so far, for the report of a run that never yields.
 func soFar() (map[string][]byte, []byte) {
-	race.Acquire(unsafe.Pointer(&killEdge))
 	soFarMu.Lock()
 	defer soFarMu.Unlock()
+	// Under the lock, so that every copy stored before it is ordered
+	// before this read, including one released after a read outside it.
+	race.Acquire(unsafe.Pointer(&killEdge))
 	s := killable
 	if s == nil {
 		return nil, nil
