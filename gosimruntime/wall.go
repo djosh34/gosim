@@ -7,6 +7,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
+
+	"github.com/jellevandenhooff/gosim/internal/race"
 )
 
 // A run started from metatesting can have a limit of real time
@@ -80,6 +83,9 @@ func startWallLimit(limit, kill time.Duration, ended func()) (stop func()) {
 var (
 	soFarMu  sync.Mutex
 	killable *scheduler
+	// killEdge orders the copies WriteArtifact makes before a kill's
+	// read of them, for the race detector.
+	killEdge byte
 )
 
 // setKillable makes s the run whose artifacts and log a kill reports.
@@ -110,6 +116,7 @@ func (b *lockedBuffer) bytes() []byte {
 // soFar returns what the current run saved with WriteArtifact and logged
 // so far, for the report of a run that never yields.
 func soFar() (map[string][]byte, []byte) {
+	race.Acquire(unsafe.Pointer(&killEdge))
 	soFarMu.Lock()
 	defer soFarMu.Unlock()
 	s := killable

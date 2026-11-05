@@ -1,23 +1,33 @@
 package gosimruntime
 
-import "bytes"
+import (
+	"bytes"
+	"unsafe"
+
+	"github.com/jellevandenhooff/gosim/internal/race"
+)
 
 // WriteArtifact saves a copy of data under name in the result of the current
-// run. Writing a name again replaces its data. It runs on the simulated
-// goroutine, under soFarMu, so that a kill after RunConfig.WallKill, on
-// another goroutine, reads what it saved.
+// run. Writing a name again replaces its data.
 func WriteArtifact(name string, data []byte) {
-	gs.get().setArtifact(name, data)
+	data = bytes.Clone(data)
+	// A kill after RunConfig.WallKill reads the copy on a goroutine of
+	// its own (soFar), which acquires killEdge; simulated goroutines never
+	// do, so this orders no two of them for the race detector.
+	race.ReleaseMerge(unsafe.Pointer(&killEdge))
+	getg().upcall(func() {
+		gs.get().setArtifact(name, data)
+	})
 }
 
-// setArtifact saves a copy of data under name, under soFarMu.
+// setArtifact saves data under name, under soFarMu.
 func (s *scheduler) setArtifact(name string, data []byte) {
 	soFarMu.Lock()
 	defer soFarMu.Unlock()
 	if s.artifacts == nil {
 		s.artifacts = make(map[string][]byte)
 	}
-	s.artifacts[name] = bytes.Clone(data)
+	s.artifacts[name] = data
 }
 
 // takeArtifacts returns what the run saved, once it ended.
