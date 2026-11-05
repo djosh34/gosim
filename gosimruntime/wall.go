@@ -118,8 +118,9 @@ func (b *lockedBuffer) bytes() []byte {
 func soFar() (map[string][]byte, []byte) {
 	soFarMu.Lock()
 	defer soFarMu.Unlock()
-	// Under the lock, so that every copy stored before it is ordered
-	// before this read, including one released after a read outside it.
+	// Under the lock: every artifact the lock lets us see was copied and
+	// released before it was stored, so this acquire orders each copy
+	// before the read.
 	race.Acquire(unsafe.Pointer(&killEdge))
 	s := killable
 	if s == nil {
