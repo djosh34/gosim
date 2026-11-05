@@ -78,11 +78,12 @@ var errEnded = errors.New("the test binary ended after its run passed RunConfig.
 // fail ends the MetaT's test binary after err, and keeps ForOtherPackage
 // from handing out the MetaT again.
 func (r *MetaT) fail(err error) error {
-	r.dead = fmt.Errorf("the test binary ended: %w", err)
-	r.cmd.Process.Kill()
-	if werr := r.cmd.Wait(); werr != nil {
-		r.dead = fmt.Errorf("%w (%v)", r.dead, werr)
+	// The binary may have ended already, and then Kill fails with
+	// os.ErrProcessDone; Wait reports how it ended either way.
+	if kerr := r.cmd.Process.Kill(); kerr != nil && !errors.Is(kerr, os.ErrProcessDone) {
+		err = errors.Join(err, kerr)
 	}
+	r.dead = fmt.Errorf("the test binary ended: %w", errors.Join(err, r.cmd.Wait()))
 	runnerMapMu.Lock()
 	if runnerMap[r.key] == r {
 		delete(runnerMap, r.key)
@@ -226,7 +227,6 @@ func (r *MetaT) Run(t *testing.T, config *RunConfig) (*RunResult, error) {
 // RunQuiet runs a test like Run, without logging its output.
 func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 	// TODO: Handle concurrent runs (lock?)
-	// TODO: Stop or restart process on error?
 
 	if r.dead != nil {
 		return nil, r.dead
