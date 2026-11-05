@@ -73,11 +73,30 @@ func startWallLimit(limit, kill time.Duration, ended func()) (stop func()) {
 	}
 }
 
+// soFarMu guards the artifacts and the log of the current run, which a
+// kill reads while the run may still write them.
+var soFarMu sync.Mutex
+
+// lockedBuffer is a run's log, written under soFarMu.
+type lockedBuffer struct {
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	soFarMu.Lock()
+	defer soFarMu.Unlock()
+	return b.buf.Write(p)
+}
+
+// bytes returns a copy of the log so far.
+func (b *lockedBuffer) bytes() []byte {
+	soFarMu.Lock()
+	defer soFarMu.Unlock()
+	return bytes.Clone(b.buf.Bytes())
+}
+
 // soFar returns what the current run saved with WriteArtifact and logged
-// so far, for the report of a run that never yields. The run's goroutine
-// may still change them; it is the report of a run that is stuck.
-//
-//go:norace
+// so far, for the report of a run that never yields.
 func soFar() (map[string][]byte, []byte) {
 	s := gs.get()
 	if s == nil {
@@ -85,7 +104,9 @@ func soFar() (map[string][]byte, []byte) {
 	}
 	var log []byte
 	if s.logBuffer != nil {
-		log = bytes.Clone(s.logBuffer.Bytes())
+		log = s.logBuffer.bytes()
 	}
+	soFarMu.Lock()
+	defer soFarMu.Unlock()
 	return maps.Clone(s.artifacts), log
 }

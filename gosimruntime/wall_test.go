@@ -1,6 +1,8 @@
 package gosimruntime
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -41,5 +43,42 @@ func TestWallStopBeforeKill(t *testing.T) {
 	case <-killed:
 		t.Fatal("a stopped run was killed")
 	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+// TestSoFarWhileWriting takes what a run saved and logged so far while the
+// run goes on saving and logging, as a kill does.
+func TestSoFarWhileWriting(t *testing.T) {
+	s := &scheduler{logBuffer: &lockedBuffer{}}
+	defer gs.set(gs.get())
+	gs.set(s)
+	stop, writing := make(chan struct{}), make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for i := 0; ; i++ {
+			if i == 1 {
+				close(writing)
+			}
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			s.setArtifact(fmt.Sprint(i%64), []byte("x"))
+			if _, err := fmt.Fprintf(s.logBuffer, "line %d\n", i); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+	})
+	<-writing
+	for range 1000 {
+		soFar()
+	}
+	close(stop)
+	wg.Wait()
+	artifacts, log := soFar()
+	if len(artifacts) == 0 || len(log) == 0 {
+		t.Errorf("got %d artifacts and %d bytes of log", len(artifacts), len(log))
 	}
 }

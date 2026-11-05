@@ -1,7 +1,6 @@
 package gosimruntime
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -120,9 +119,11 @@ type scheduler struct {
 	abortDetail string
 
 	// artifacts holds the data passed to WriteArtifact, by name, and
-	// logBuffer the run's log, if it captures it.
+	// logBuffer the run's log, if it captures it. A kill after
+	// RunConfig.WallKill reads both while the run may still write them,
+	// so both are written under soFarMu.
 	artifacts map[string][]byte
-	logBuffer *bytes.Buffer
+	logBuffer *lockedBuffer
 
 	// race token given to background goroutines so they can read gs fields
 	globaltoken RaceToken
@@ -365,9 +366,9 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	}
 
 	var logOut io.Writer = simLogger
-	var logBuffer *bytes.Buffer
+	var logBuffer *lockedBuffer
 	if captureLog {
-		logBuffer = &bytes.Buffer{}
+		logBuffer = &lockedBuffer{}
 		logOut = io.MultiWriter(logBuffer, logOut)
 	}
 
@@ -415,7 +416,7 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	}
 	var capturedLog []byte
 	if captureLog {
-		capturedLog = logBuffer.Bytes()
+		capturedLog = logBuffer.bytes()
 	}
 	return internalRunResult{
 		Seed:      seed,
