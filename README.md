@@ -33,6 +33,15 @@
 > - A simulated program can pass data to the test that runs it with
 >   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
 >   `MetaT.RunQuiet` runs a test without logging its output.
+> - A run can have limits of real time (`metatesting.RunConfig.WallLimit` and
+>   `WallKill`). The simulation reads the first with `gosim.WallLimitPassed`
+>   and stops itself, with `gosim.Stacks` for its report. The second ends a
+>   test binary whose run never yields: the run fails with what it saved and
+>   logged so far and every goroutine's stack (`gosim-stacks.txt`), and the
+>   next run starts a new binary.
+> - A run copies its environment into a map, and each insert into a map of
+>   more than 4 entries draws from the run's random stream, so the number of
+>   `ExtraEnv` entries changes the run; pass the same variables every time.
 > - Weak pointers stay strong and cleanups never run, since the garbage
 >   collector is not part of the simulation.
 > - `sync.Map` hashes every key to 0, so its order depends only on the order
