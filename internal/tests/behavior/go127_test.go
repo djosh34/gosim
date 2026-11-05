@@ -127,6 +127,29 @@ func TestWriteArtifact(t *testing.T) {
 	gosim.WriteArtifact("artifact.txt", []byte("hello"))
 }
 
+// TestWallLimit waits, on the simulated clock, until its limit of real
+// time passed, and saves every goroutine's stack.
+func TestWallLimit(t *testing.T) {
+	if os.Getenv("TESTINGWALL") != "1" {
+		t.Skip()
+	}
+	for !gosim.WallLimitPassed() {
+		time.Sleep(time.Millisecond)
+	}
+	gosim.WriteArtifact("stacks", gosim.Stacks())
+}
+
+// TestWallKill never yields, so only its second limit of real time ends
+// it.
+func TestWallKill(t *testing.T) {
+	if os.Getenv("TESTINGWALL") != "1" {
+		t.Skip()
+	}
+	for n := 0; ; n++ {
+		_ = n
+	}
+}
+
 func TestUnimplementedHook(t *testing.T) {
 	if os.Getenv("TESTINGFAIL") != "1" {
 		t.Skip()

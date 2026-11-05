@@ -83,6 +83,20 @@ func SetSimulationTimeout(d time.Duration) {
 	}
 }
 
+// WallLimitPassed reports whether the current run's limit of real time,
+// set by the test that started it with metatesting.RunConfig.WallLimit, has
+// passed. A simulation reads it where it can stop and report itself; until
+// the limit passes it changes nothing in the run.
+func WallLimitPassed() bool {
+	return gosimruntime.WallLimitPassed()
+}
+
+// Stacks returns the stack of every goroutine of the process, the
+// simulation's included, for the report of a run that went on too long.
+func Stacks() []byte {
+	return gosimruntime.Stacks()
+}
+
 // WriteArtifact saves a copy of data under name in the result of the current
 // run, for the test that started the run: a test using metatesting reads it
 // from RunResult.Artifacts. The simulation cannot read it back. Writing a name

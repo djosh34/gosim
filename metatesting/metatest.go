@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -31,6 +32,14 @@ type RunConfig struct {
 	Seed     int64
 	ExtraEnv []string
 	Simtrace string
+	// WallLimit, if set, is the run's limit of real time, which the
+	// simulation reads with gosim.WallLimitPassed. WallKill, if set,
+	// ends the test binary after that much real time, with every
+	// goroutine's stack on its stderr, for a run that never gets to read
+	// WallLimit; RunQuiet then returns an error, and the next run starts
+	// a new test binary.
+	WallLimit time.Duration
+	WallKill  time.Duration
 }
 
 // A RunResult contains the result fo a test run.
@@ -53,6 +62,27 @@ type MetaT struct {
 
 	w *json.Encoder
 	r *json.Decoder
+
+	// key is the MetaT's key in runnerMap, and dead the error that ended
+	// its test binary, after which ForOtherPackage starts a new one.
+	key  string
+	dead error
+}
+
+// fail ends the MetaT's test binary after err, and keeps ForOtherPackage
+// from handing out the MetaT again.
+func (r *MetaT) fail(err error) error {
+	r.dead = fmt.Errorf("the test binary ended: %w", err)
+	r.cmd.Process.Kill()
+	if werr := r.cmd.Wait(); werr != nil {
+		r.dead = fmt.Errorf("%w (%v)", r.dead, werr)
+	}
+	runnerMapMu.Lock()
+	if runnerMap[r.key] == r {
+		delete(runnerMap, r.key)
+	}
+	runnerMapMu.Unlock()
+	return r.dead
 }
 
 type prefixer struct {
@@ -192,14 +222,17 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 	// TODO: Handle concurrent runs (lock?)
 	// TODO: Stop or restart process on error?
 
+	if r.dead != nil {
+		return nil, r.dead
+	}
 	if err := r.w.Encode(config); err != nil {
-		return nil, err
+		return nil, r.fail(err)
 	}
 
 	var result RunResult
 	if err := r.r.Decode(&result); err != nil {
 		// TODO: Print results that fail to decode
-		return nil, err
+		return nil, r.fail(err)
 	}
 	return &result, nil
 }
@@ -230,6 +263,7 @@ func ForOtherPackage(t *testing.T, pkg string, tags ...string) *MetaT {
 	if err != nil {
 		t.Fatalf("failed to run test binary: %s", err)
 	}
+	runner.key = key
 	runnerMap[key] = runner
 	return runner
 }

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Test struct {
@@ -35,10 +36,12 @@ var metatest = flag.Bool("metatest", false, "")
 
 // Copied in metatesting.RunConfig. Keep in sync.
 type runConfig struct {
-	Test     string
-	Seed     int64
-	ExtraEnv []string
-	Simtrace string
+	Test      string
+	Seed      int64
+	ExtraEnv  []string
+	Simtrace  string
+	WallLimit time.Duration
+	WallKill  time.Duration
 }
 
 // Copied in metatesting.RunResult. Keep in sync.
@@ -219,6 +222,7 @@ func TestMain(rt Runtime) {
 			continue
 		}
 
+		stopWall := startWallLimit(req.WallLimit, req.WallKill)
 		result := run(func() {
 			// TODO: add an entrypoint that takes a single test?
 			// TODO: fail gracefully with non-existent tests?
@@ -232,6 +236,7 @@ func TestMain(rt Runtime) {
 				SetAbortError(ErrTestFailed)
 			}
 		}, seed, enableTracer, captureLog, logLevelOverride, io.Discard, req.ExtraEnv)
+		stopWall()
 
 		metaResult := runResult{
 			Seed:      result.Seed,
