@@ -5,6 +5,7 @@ package metatesting
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
 )
+
+var errTestDone = errors.New("the test is done")
 
 // fakeBinary makes this test binary, started with $GOSIM_FAKE_METATEST
 // set, a metatest binary that answers each run as a run with a data race
@@ -30,6 +33,8 @@ func TestMain(m *testing.M) {
 				os.Exit(0)
 			}
 			fmt.Fprintln(os.Stderr, "WARNING: DATA RACE")
+			// A run can leave its last line without a newline.
+			fmt.Fprint(os.Stderr, "no newline")
 			fmt.Fprintln(os.Stderr, gosimruntime.MetatestResultMark)
 			if err := out.Encode(RunResult{Seed: cfg.Seed, Failed: true, Err: "race detected"}); err != nil {
 				os.Exit(1)
@@ -70,12 +75,9 @@ func TestStderrBeforeResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		if err := r.cmd.Process.Kill(); err != nil {
-			t.Error(err)
-		}
-		_ = r.cmd.Wait()
-	}()
+	// fail ends the binary, as after a run that broke it; its error says
+	// that it was killed.
+	defer func() { _ = r.fail(errTestDone) }()
 	res, err := r.RunQuiet(&RunConfig{Test: "TestBad", Seed: 1})
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +85,7 @@ func TestStderrBeforeResult(t *testing.T) {
 	if !res.Failed {
 		t.Error("the run passed")
 	}
-	if got := w.String(); !strings.Contains(got, "metatest binary: WARNING: DATA RACE\n") {
+	if got := w.String(); !strings.Contains(got, "metatest binary: WARNING: DATA RACE\nmetatest binary: no newline\n") {
 		t.Errorf("the result came back before the run's stderr: forwarded %q", got)
 	}
 	if strings.Contains(w.String(), gosimruntime.MetatestResultMark) {

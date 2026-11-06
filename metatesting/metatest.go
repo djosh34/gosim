@@ -88,6 +88,10 @@ func (r *MetaT) fail(err error) error {
 	if kerr := r.cmd.Process.Kill(); kerr != nil && !errors.Is(kerr, os.ErrProcessDone) {
 		err = errors.Join(err, kerr)
 	}
+	// Wait closes the stderr pipe, so the binary's last words, such as a
+	// panic, are forwarded first: the forwarder closes marks at the end.
+	for range r.marks {
+	}
 	r.dead = fmt.Errorf("the test binary ended: %w", errors.Join(err, r.cmd.Wait()))
 	runnerMapMu.Lock()
 	if runnerMap[r.key] == r {
@@ -109,15 +113,22 @@ func forwardStderr(stderr io.Reader, marks chan<- struct{}) {
 	r := bufio.NewReader(stderr)
 	for {
 		line, err := r.ReadString('\n')
-		if strings.TrimSuffix(line, "\n") == gosimruntime.MetatestResultMark {
-			marks <- struct{}{}
-		} else if line != "" {
-			if !strings.HasSuffix(line, "\n") {
-				line += "\n"
+		// The mark ends its line, after whatever the run wrote without a
+		// newline.
+		text, mark := strings.CutSuffix(strings.TrimSuffix(line, "\n"), gosimruntime.MetatestResultMark)
+		if !mark {
+			text = line
+		}
+		if text != "" {
+			if !strings.HasSuffix(text, "\n") {
+				text += "\n"
 			}
 			// A failed write leaves the line out; the run's result still
 			// comes back.
-			_, _ = io.WriteString(forward, "metatest binary: "+line)
+			_, _ = io.WriteString(forward, "metatest binary: "+text)
+		}
+		if mark {
+			marks <- struct{}{}
 		}
 		if err != nil {
 			return
