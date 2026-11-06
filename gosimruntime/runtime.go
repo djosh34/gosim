@@ -80,6 +80,12 @@ func getg() *goroutine {
 type Machine struct {
 	label   string
 	globals unsafe.Pointer
+
+	// timerCalls are the calls of the machine's timers that fired, which
+	// timerG runs in order. timerG starts at the first and waits while
+	// there are none (RunFromTimerHandler).
+	timerCalls []func()
+	timerG     *goroutine
 }
 
 func newMachine(label string) *Machine {
@@ -902,6 +908,45 @@ func GoFromTimerHandler(fun func(), machine *Machine) {
 	gs.get().Go(fun, machine, gs.get().globaltoken)
 }
 
+// RunFromTimerHandler runs fun on machine's timer goroutine, after the
+// calls of timers that fired before it. fun must not block: like Go's
+// own timer functions, which send on a timer's channel without waiting
+// or start the goroutine of an AfterFunc. One goroutine per machine runs
+// them all, as Go's runtime runs a P's timers with one race context, so
+// a timer that fires costs no new goroutine.
+//
+//go:norace
+func RunFromTimerHandler(fun func(), machine *Machine) {
+	if getg() != nil {
+		panic("must be called without g")
+	}
+
+	machine.timerCalls = append(machine.timerCalls, fun)
+	if machine.timerG == nil {
+		machine.timerG = gs.get().Go(func() { runTimerCalls(machine) }, machine, gs.get().globaltoken)
+		return
+	}
+	if machine.timerG.waiting {
+		machine.timerG.setWaiting(false)
+	}
+}
+
+// runTimerCalls is the body of machine's timer goroutine.
+//
+//go:norace
+func runTimerCalls(machine *Machine) {
+	g := getg()
+	for {
+		for len(machine.timerCalls) > 0 {
+			fun := machine.timerCalls[0]
+			machine.timerCalls[0] = nil
+			machine.timerCalls = machine.timerCalls[1:]
+			fun()
+		}
+		g.wait()
+	}
+}
+
 // Marked go:norace to return result.
 //
 //go:norace
@@ -948,6 +993,7 @@ func StopMachine(machine *Machine) {
 		// unhook timer events
 		// XXX: inefficient:
 		gs.clock.removemachine(machine)
+		machine.timerCalls, machine.timerG = nil, nil
 
 		// XXX: poison machine for future use? set globals to nil?
 		// XXX: could later also reuse globals struct (after zeroing...) (but maybe not in super paranoid mode)
