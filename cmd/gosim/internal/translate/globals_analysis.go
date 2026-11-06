@@ -47,7 +47,10 @@ func collectGlobalsAndTests(files []*dst.File, astMap decorator.AstMap, pkgPath 
 }
 
 var globalsDontTranslateGo127 = map[packageSelector]bool{
-	{Pkg: "crypto/sha512", Selector: "_K"}: true,
+	// The assembly of these packages (keepAsmPackagesGo127) reads them.
+	{Pkg: "crypto/internal/fips140/bigmod", Selector: "supportADX"}: true,
+	{Pkg: "crypto/internal/fips140/sha256", Selector: "_K"}:         true,
+	{Pkg: "crypto/internal/fips140/sha512", Selector: "_K"}:         true,
 	// {pkg: "sync/atomic", selector: "firstStoreInProgress"}: true, // no way... universe strikes once again
 	{Pkg: "encoding/json", Selector: "fieldCache"}:   true,
 	{Pkg: "encoding/json", Selector: "encoderCache"}: true,
@@ -79,12 +82,6 @@ var globalsDontTranslateGo127 = map[packageSelector]bool{
 	{Pkg: "golang.org/x/net/idna", Selector: "idnaSparseValues"}:                 true,
 	{Pkg: reflectPackage, Selector: "mapInterfaceType"}:                          true,
 	{Pkg: reflectPackage, Selector: "jankHashMap"}:                               true,
-
-	// xxx amd64 asm
-	{Pkg: "crypto/sha256", Selector: "useSHA"}:                                true,
-	{Pkg: "crypto/sha256", Selector: "useAVX2"}:                               true,
-	{Pkg: "vendor/golang.org/x/crypto/chacha20poly1305", Selector: "useAVX2"}: true,
-	{Pkg: "crypto/internal/bigmod", Selector: "supportADX"}:                   true,
 
 	{Pkg: "github.com/cespare/xxhash/v2", Selector: "primes"}: true,
 }

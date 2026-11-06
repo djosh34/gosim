@@ -51,7 +51,8 @@ func TestHookSignatures(t *testing.T) {
 		pkgs, err := packages.Load(&packages.Config{
 			Mode:       packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
 			Env:        append(os.Environ(), "GOOS=linux", "GOARCH="+goarch, "CGO_ENABLED=0"),
-			BuildFlags: []string{"-tags", "sim,purego"},
+			BuildFlags: []string{"-tags", "sim"},
+			Overlay:    stdOverlay(),
 		}, patterns...)
 		if err != nil {
 			t.Fatal(err)
