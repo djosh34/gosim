@@ -69,8 +69,9 @@ type MetaT struct {
 	w *json.Encoder
 	r *json.Decoder
 	// marks gets a value each time the forwarded stderr reaches a result
-	// mark, and is closed when stderr ends.
-	marks chan struct{}
+	// mark: the first error of forwarding so far, or nil. It is closed
+	// when stderr ends.
+	marks chan error
 
 	// key is the MetaT's key in runnerMap, and dead the error that ended
 	// its test binary, after which ForOtherPackage starts a new one.
@@ -106,10 +107,12 @@ func (r *MetaT) fail(err error) error {
 var forward io.Writer = os.Stderr
 
 // forwardStderr copies the lines of the test binary's stderr to forward,
-// each prefixed, and sends on marks for each result mark it reads, and
-// closes marks at the end of stderr.
-func forwardStderr(stderr io.Reader, marks chan<- struct{}) {
+// each prefixed, and sends on marks for each result mark it reads, with
+// the first error of forward so far, and closes marks at the end of
+// stderr. After an error it forwards nothing more.
+func forwardStderr(stderr io.Reader, marks chan<- error) {
 	defer close(marks)
+	var failed error
 	r := bufio.NewReader(stderr)
 	for {
 		line, err := r.ReadString('\n')
@@ -119,16 +122,16 @@ func forwardStderr(stderr io.Reader, marks chan<- struct{}) {
 		if !mark {
 			text = line
 		}
-		if text != "" {
+		if text != "" && failed == nil {
 			if !strings.HasSuffix(text, "\n") {
 				text += "\n"
 			}
-			// A failed write leaves the line out; the run's result still
-			// comes back.
-			_, _ = io.WriteString(forward, "metatest binary: "+text)
+			if _, werr := io.WriteString(forward, "metatest binary: "+text); werr != nil {
+				failed = fmt.Errorf("forwarding the test binary's stderr: %w", werr)
+			}
 		}
 		if mark {
-			marks <- struct{}{}
+			marks <- failed
 		}
 		if err != nil {
 			return
@@ -154,7 +157,7 @@ func newRunner(path string) (*MetaT, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	marks := make(chan struct{}, 1)
+	marks := make(chan error, 1)
 	go forwardStderr(stderr, marks)
 
 	w := json.NewEncoder(stdin)
@@ -170,9 +173,10 @@ func newRunner(path string) (*MetaT, error) {
 }
 
 // waitStderr waits until the test binary's stderr up to the mark of the
-// result just read is forwarded, or stderr ended.
-func (r *MetaT) waitStderr() {
-	<-r.marks
+// result just read is forwarded, or stderr ended, and returns an error of
+// the forwarding.
+func (r *MetaT) waitStderr() error {
+	return <-r.marks
 }
 
 // TODO: Support match expressions?
@@ -187,7 +191,9 @@ func (r *MetaT) ListTests() ([]string, error) {
 	if err := r.r.Decode(&tests); err != nil {
 		return nil, err
 	}
-	r.waitStderr()
+	if err := r.waitStderr(); err != nil {
+		return nil, err
+	}
 
 	return tests, nil
 }
@@ -269,7 +275,9 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 		// TODO: Print results that fail to decode
 		return nil, r.fail(err)
 	}
-	r.waitStderr()
+	if err := r.waitStderr(); err != nil {
+		return nil, r.fail(err)
+	}
 	if result.Ended {
 		r.fail(errEnded)
 	}

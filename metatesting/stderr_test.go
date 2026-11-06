@@ -63,6 +63,29 @@ func (w *slowWriter) String() string {
 	return w.buf.String()
 }
 
+// failWriter fails every write.
+type failWriter struct{}
+
+var errNoRoom = errors.New("no room")
+
+func (failWriter) Write([]byte) (int, error) { return 0, errNoRoom }
+
+// TestStderrForwardFails checks that a run whose stderr cannot be
+// forwarded fails with that error.
+func TestStderrForwardFails(t *testing.T) {
+	t.Setenv(fakeBinary, "1")
+	forward = failWriter{}
+	defer func() { forward = os.Stderr }()
+	r, err := newRunner(os.Args[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.fail(errTestDone) }()
+	if _, err := r.RunQuiet(&RunConfig{Test: "TestBad", Seed: 1}); !errors.Is(err, errNoRoom) {
+		t.Errorf("the run gave %v, want an error with %v", err, errNoRoom)
+	}
+}
+
 // TestStderrBeforeResult checks that a run's result comes back only after
 // what the run wrote to stderr before it was forwarded, however slowly
 // (tigerstore #530).
