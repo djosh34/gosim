@@ -83,8 +83,8 @@ func TestCRC32(t *testing.T) {
 	}
 }
 
-// TestTLSCipher checks that a TLS 1.3 handshake picks ChaCha20-Poly1305,
-// whatever the CPU, so that a run does not depend on the machine.
+// TestTLSCipher checks that a TLS 1.3 handshake picks AES-GCM, whatever
+// the CPU, so that a run does not depend on the machine.
 func TestTLSCipher(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -119,7 +119,7 @@ func TestTLSCipher(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
-	if got := c.ConnectionState().CipherSuite; got != tls.TLS_CHACHA20_POLY1305_SHA256 {
-		t.Errorf("the handshake picked %s, want TLS_CHACHA20_POLY1305_SHA256", tls.CipherSuiteName(got))
+	if got := c.ConnectionState().CipherSuite; got != tls.TLS_AES_128_GCM_SHA256 {
+		t.Errorf("the handshake picked %s, want TLS_AES_128_GCM_SHA256", tls.CipherSuiteName(got))
 	}
 }

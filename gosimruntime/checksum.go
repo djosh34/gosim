@@ -10,13 +10,23 @@ type checksummer struct {
 	step   int
 	hash   fnv64
 	logger *slog.Logger
+	// level is the level of the checksum's log lines, and logs whether
+	// the logger takes them, which a run does not change.
+	level slog.Level
+	logs  bool
 }
 
 func newChecksummer(logger *slog.Logger) *checksummer {
+	level := slog.LevelDebug
+	if *forceChecksum {
+		level = slog.LevelError
+	}
 	return &checksummer{
 		step:   0,
 		hash:   newFnv64(),
 		logger: logger,
+		level:  level,
+		logs:   logger.Enabled(context.TODO(), level),
 	}
 }
 
@@ -39,16 +49,12 @@ func (t *checksummer) recordIntInt(key checksumKey, a, b uint64) {
 		panic("help")
 	}
 
-	t.hash.Hash([]byte{byte(key)})
-	t.hash.HashInt(a)
-	t.hash.HashInt(b)
+	t.hash.HashWord(uint64(key))
+	t.hash.HashWord(a)
+	t.hash.HashWord(b)
 
-	level := slog.LevelDebug
-	if *forceChecksum {
-		level = slog.LevelError
-	}
-	if t.logger.Enabled(context.TODO(), level) {
-		t.logger.LogAttrs(context.TODO(), level, "checksummer",
+	if t.logs {
+		t.logger.LogAttrs(context.TODO(), t.level, "checksummer",
 			slog.Int("step", t.step),
 			slog.String("key", key.String()),
 			slog.Int("a", int(a)),
@@ -63,15 +69,11 @@ func (t *checksummer) recordBytes(key checksumKey, a []byte) {
 		panic("help")
 	}
 
-	t.hash.Hash([]byte{byte(key)})
+	t.hash.HashWord(uint64(key))
 	t.hash.Hash(a)
 
-	level := slog.LevelDebug
-	if *forceChecksum {
-		level = slog.LevelError
-	}
-	if t.logger.Enabled(context.TODO(), level) {
-		t.logger.LogAttrs(context.TODO(), level, "checksummer",
+	if t.logs {
+		t.logger.LogAttrs(context.TODO(), t.level, "checksummer",
 			slog.Int("step", t.step),
 			slog.String("key", key.String()),
 			slog.String("a", string(a)),
