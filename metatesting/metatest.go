@@ -1,10 +1,12 @@
 package metatesting
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -66,6 +68,10 @@ type MetaT struct {
 
 	w *json.Encoder
 	r *json.Decoder
+	// marks gets a value each time the forwarded stderr reaches a result
+	// mark: the first error of forwarding so far, or nil. It is closed
+	// when stderr ends.
+	marks chan error
 
 	// key is the MetaT's key in runnerMap, and dead the error that ended
 	// its test binary, after which ForOtherPackage starts a new one.
@@ -83,7 +89,15 @@ func (r *MetaT) fail(err error) error {
 	if kerr := r.cmd.Process.Kill(); kerr != nil && !errors.Is(kerr, os.ErrProcessDone) {
 		err = errors.Join(err, kerr)
 	}
-	r.dead = fmt.Errorf("the test binary ended: %w", errors.Join(err, r.cmd.Wait()))
+	// Wait closes the stderr pipe, so the binary's last words, such as a
+	// panic, are forwarded first: the forwarder closes marks at the end.
+	var ferr error
+	for e := range r.marks {
+		if ferr == nil {
+			ferr = e
+		}
+	}
+	r.dead = fmt.Errorf("the test binary ended: %w", errors.Join(err, ferr, r.cmd.Wait()))
 	runnerMapMu.Lock()
 	if runnerMap[r.key] == r {
 		delete(runnerMap, r.key)
@@ -92,29 +106,50 @@ func (r *MetaT) fail(err error) error {
 	return r.dead
 }
 
-type prefixer struct {
-	out    *os.File
-	prefix string
-}
+// forward is where a MetaT's test binary's stderr goes, each line
+// prefixed: os.Stderr, or what a test sets.
+var forward io.Writer = os.Stderr
 
-func (w prefixer) Write(b []byte) (n int, err error) {
-	n = len(b)
-	for len(b) > 0 {
-		end := bytes.IndexByte(b, '\n')
-		if end == -1 {
-			end = len(b)
-		} else {
-			end++
+// forwardStderr copies the lines of the test binary's stderr to forward,
+// each prefixed, and sends on marks for each result mark it reads, with
+// the first error of forward so far. At the end of stderr it sends that
+// error, or one of reading stderr, if there is one, and closes marks.
+// After an error it forwards nothing more.
+func forwardStderr(stderr io.Reader, marks chan<- error) {
+	defer close(marks)
+	var failed error
+	r := bufio.NewReader(stderr)
+	for {
+		line, err := r.ReadString('\n')
+		// The mark ends its line, after whatever the run wrote without a
+		// newline.
+		text, mark := strings.CutSuffix(strings.TrimSuffix(line, "\n"), gosimruntime.MetatestResultMark)
+		if !mark {
+			text = line
 		}
-		line := b[:end]
-		w.out.WriteString(w.prefix)
-		w.out.Write(line)
-		if line[len(line)-1] != '\n' {
-			w.out.WriteString("\n")
+		if text != "" && failed == nil {
+			if !strings.HasSuffix(text, "\n") {
+				text += "\n"
+			}
+			if _, werr := io.WriteString(forward, "metatest binary: "+text); werr != nil {
+				failed = fmt.Errorf("forwarding the test binary's stderr: %w", werr)
+			}
 		}
-		b = b[end:]
+		if mark {
+			marks <- failed
+		}
+		if err != nil {
+			if !errors.Is(err, io.EOF) && failed == nil {
+				failed = fmt.Errorf("reading the test binary's stderr: %w", err)
+			}
+			if failed != nil {
+				// The error once more, for a write error that no mark
+				// carried, or a read error.
+				marks <- failed
+			}
+			return
+		}
 	}
-	return
 }
 
 func newRunner(path string) (*MetaT, error) {
@@ -127,14 +162,16 @@ func newRunner(path string) (*MetaT, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: Do not discard, and disable the formatted output print in gosimruntime instead
-	// TODO: Prefix output to help identify stray logging?
-	cmd.Stderr = &prefixer{out: os.Stderr, prefix: "metatest binary: "}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	marks := make(chan error, 1)
+	go forwardStderr(stderr, marks)
 
 	w := json.NewEncoder(stdin)
 	r := json.NewDecoder(stdout)
@@ -142,9 +179,17 @@ func newRunner(path string) (*MetaT, error) {
 	return &MetaT{
 		cmd: cmd,
 
-		w: w,
-		r: r,
+		w:     w,
+		r:     r,
+		marks: marks,
 	}, nil
+}
+
+// waitStderr waits until the test binary's stderr up to the mark of the
+// result just read is forwarded, or stderr ended, and returns an error of
+// the forwarding.
+func (r *MetaT) waitStderr() error {
+	return <-r.marks
 }
 
 // TODO: Support match expressions?
@@ -157,6 +202,9 @@ func (r *MetaT) ListTests() ([]string, error) {
 
 	var tests []string
 	if err := r.r.Decode(&tests); err != nil {
+		return nil, err
+	}
+	if err := r.waitStderr(); err != nil {
 		return nil, err
 	}
 
@@ -238,6 +286,9 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 	var result RunResult
 	if err := r.r.Decode(&result); err != nil {
 		// TODO: Print results that fail to decode
+		return nil, r.fail(err)
+	}
+	if err := r.waitStderr(); err != nil {
 		return nil, r.fail(err)
 	}
 	if result.Ended {

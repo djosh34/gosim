@@ -102,6 +102,24 @@ func parseSeeds(seedsStr string) ([]seedRange, error) {
 	return seeds, nil
 }
 
+// MetatestResultMark is the line a metatest binary writes to stderr right
+// before each result it writes to stdout. The two are separate pipes, so
+// metatesting waits until its copy of stderr reaches the line before it
+// hands back the result, and nothing the run wrote to stderr, such as a
+// race report, comes after it or is lost (tigerstore #530).
+const MetatestResultMark = "gosim metatest: result follows"
+
+// resultWriter writes the results of a metatest binary.
+type resultWriter struct{ enc *json.Encoder }
+
+// Encode writes MetatestResultMark to stderr, then v to stdout.
+func (w resultWriter) Encode(v any) error {
+	if _, err := fmt.Fprintln(os.Stderr, MetatestResultMark); err != nil {
+		return err
+	}
+	return w.enc.Encode(v)
+}
+
 func TestMain(rt Runtime) {
 	simtrace := flag.String("simtrace", "", "set of comma-separated traces to enable")
 	seedsStr := flag.String("seeds", "1", "comma-separated list of seeds and ranges")
@@ -193,7 +211,7 @@ func TestMain(rt Runtime) {
 	}
 
 	in := json.NewDecoder(os.Stdin)
-	out := json.NewEncoder(os.Stdout)
+	out := resultWriter{json.NewEncoder(os.Stdout)}
 
 	for {
 		var req runConfig
