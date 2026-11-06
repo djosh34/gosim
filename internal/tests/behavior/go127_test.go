@@ -24,6 +24,7 @@ import (
 	"weak"
 
 	"github.com/jellevandenhooff/gosim"
+	"github.com/jellevandenhooff/gosim/gosimruntime"
 )
 
 // Tests for what the Go 1.27 port added or changed.
@@ -210,9 +211,37 @@ func TestHostFileSlots(t *testing.T) {
 			t.Errorf("the slot of %s holds %q", o.name, got)
 		}
 	}
-	if _, err := f.Slot(&owner{}, 32); err == nil {
-		t.Error("a slot of another size than the file's first")
+	if _, err := f.Slot(&owner{}, 32); !errors.Is(err, gosimruntime.ErrSlotSize) {
+		t.Errorf("a slot of another size than the file's first: %v, want %v", err, gosimruntime.ErrSlotSize)
 	}
+	// Once its owner is garbage, a slot comes back for another.
+	gone := &owner{"gone"}
+	at, err := f.Slot(gone, 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteAt([]byte(fmt.Sprintf("%-16s", gone.name)), at); err != nil {
+		t.Fatal(err)
+	}
+	gone = nil
+	reused := false
+	for range 50 {
+		runtime.GC()
+		next := &owner{"next"}
+		off, err := f.Slot(next, 16)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owners = append(owners, next)
+		if off == at {
+			reused = true
+			break
+		}
+	}
+	if !reused {
+		t.Error("the slot of an owner that is garbage never came back")
+	}
+	runtime.KeepAlive(owners)
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
