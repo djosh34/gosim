@@ -80,6 +80,12 @@ func getg() *goroutine {
 type Machine struct {
 	label   string
 	globals unsafe.Pointer
+
+	// timerCalls are the calls of the machine's timers that fired, which
+	// timerG runs in order. timerG starts at the first and waits while
+	// there are none (RunFromTimerHandler).
+	timerCalls []func()
+	timerG     *goroutine
 }
 
 func newMachine(label string) *Machine {
@@ -902,6 +908,58 @@ func GoFromTimerHandler(fun func(), machine *Machine) {
 	gs.get().Go(fun, machine, gs.get().globaltoken)
 }
 
+// RunFromTimerHandler runs fun on machine's timer goroutine, with the
+// other calls of timers that fired at the same instant, in random order.
+// fun must not block: like Go's own timer functions, which send on a
+// timer's channel without waiting or start the goroutine of an
+// AfterFunc. One goroutine per machine runs them all, so that a timer
+// that fires costs no new goroutine.
+//
+// It shares one race context between the calls, which Go's race
+// detector does not: a call would order the writes before an earlier
+// timer's Reset before an unrelated AfterFunc. Race builds run each call
+// on a goroutine of its own instead (GoFromTimerHandler).
+//
+//go:norace
+func RunFromTimerHandler(fun func(), machine *Machine) {
+	if getg() != nil {
+		panic("must be called without g")
+	}
+
+	// The calls waiting all come from timers that fired at this instant:
+	// the clock moves only once no goroutine can run. Their order is the
+	// run's to pick, as when each had a goroutine of its own.
+	calls := append(machine.timerCalls, fun)
+	if n := uint32(len(calls)); n > 1 {
+		k := gs.get().fastrander.fastrandn(n)
+		calls[k], calls[n-1] = calls[n-1], calls[k]
+	}
+	machine.timerCalls = calls
+	if machine.timerG == nil {
+		machine.timerG = gs.get().Go(func() { runTimerCalls(machine) }, machine, gs.get().globaltoken)
+		return
+	}
+	if machine.timerG.waiting {
+		machine.timerG.setWaiting(false)
+	}
+}
+
+// runTimerCalls is the body of machine's timer goroutine.
+//
+//go:norace
+func runTimerCalls(machine *Machine) {
+	g := getg()
+	for {
+		for len(machine.timerCalls) > 0 {
+			fun := machine.timerCalls[0]
+			machine.timerCalls[0] = nil
+			machine.timerCalls = machine.timerCalls[1:]
+			fun()
+		}
+		g.wait()
+	}
+}
+
 // Marked go:norace to return result.
 //
 //go:norace
@@ -948,6 +1006,7 @@ func StopMachine(machine *Machine) {
 		// unhook timer events
 		// XXX: inefficient:
 		gs.clock.removemachine(machine)
+		machine.timerCalls, machine.timerG = nil, nil
 
 		// XXX: poison machine for future use? set globals to nil?
 		// XXX: could later also reuse globals struct (after zeroing...) (but maybe not in super paranoid mode)
