@@ -148,6 +148,21 @@ func (f *HostFile) ReadAt(p []byte, off int64) (int, error) {
 	return n, hostErr(err)
 }
 
+// Slot returns the offset of a free slot of size bytes in the file, for
+// the caller to write and read, which stays taken while owner is
+// reachable: once owner is garbage, a later call may get the slot again.
+// Every slot of a file has the size of its first. owner must point to
+// the start of an object of its own, with no finalizer, as
+// runtime.SetFinalizer requires; Slot sets one, outside the simulation.
+//
+// Which slot a call gets depends on when the collector ran, so it differs
+// from run to run: the run must use the offset only to read and write
+// the file.
+func (f *HostFile) Slot(owner any, size int) (int64, error) {
+	off, err := gosimruntime.HostSlot(f.h, owner, size)
+	return off, hostErr(err)
+}
+
 // Close closes the file and gives its space back.
 func (f *HostFile) Close() error {
 	return hostErr(gosimruntime.HostClose(f.h))

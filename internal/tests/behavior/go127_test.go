@@ -6,6 +6,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"fmt"
 	"hash/maphash"
 	"io"
 	"io/fs"
@@ -16,6 +17,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -173,6 +175,49 @@ func TestHostFile(t *testing.T) {
 	}
 	if err := f.Close(); !errors.Is(err, fs.ErrClosed) {
 		t.Errorf("a second close gave %v, want fs.ErrClosed", err)
+	}
+}
+
+// TestHostFileSlots checks that a simulation's live owners get slots of
+// their own in a host file, which keep what is written to them.
+func TestHostFileSlots(t *testing.T) {
+	f, err := gosim.CreateHostFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	type owner struct{ name string }
+	owners := []*owner{{"a"}, {"b"}, {"c"}}
+	offs := map[int64]*owner{}
+	for _, o := range owners {
+		off, err := f.Slot(o, 16)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if offs[off] != nil {
+			t.Fatalf("%s and %s got the slot at %d", offs[off].name, o.name, off)
+		}
+		offs[off] = o
+		if _, err := f.WriteAt([]byte(fmt.Sprintf("%-16s", o.name)), off); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for off, o := range offs {
+		b := make([]byte, 16)
+		if _, err := f.ReadAt(b, off); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.TrimSpace(string(b)); got != o.name {
+			t.Errorf("the slot of %s holds %q", o.name, got)
+		}
+	}
+	if _, err := f.Slot(&owner{}, 32); err == nil {
+		t.Error("a slot of another size than the file's first")
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Slot(&owner{}, 16); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("a slot of a closed host file gave %v, want fs.ErrClosed", err)
 	}
 }
 

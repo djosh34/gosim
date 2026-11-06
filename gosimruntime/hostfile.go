@@ -2,8 +2,11 @@ package gosimruntime
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"reflect"
+	"runtime"
 	"sync"
 )
 
@@ -20,8 +23,17 @@ import (
 var (
 	hostMu    sync.Mutex
 	hostFiles = map[int]*os.File{}
+	hostSlots = map[int]*slots{}
 	hostNext  int
 )
+
+// slots are the slots of one host file: of size bytes each, end bytes in
+// all, the free ones in free.
+type slots struct {
+	size int64
+	end  int64
+	free []int64
+}
 
 // ErrNoHostFile is the error of a call on a host file that is closed or
 // was never made. The simulation sees it as its own fs.ErrClosed.
@@ -86,8 +98,63 @@ func closeHostFiles() error {
 	for h, f := range hostFiles {
 		errs = append(errs, f.Close())
 		delete(hostFiles, h)
+		delete(hostSlots, h)
 	}
 	return errors.Join(errs...)
+}
+
+// ErrSlotSize is the error of a slot of a size other than the host
+// file's first slot's.
+var ErrSlotSize = errors.New("gosim: a host file's slots all have one size")
+
+// ErrSlotOwner is the error of a slot whose owner is not a pointer.
+var ErrSlotOwner = errors.New("gosim: a host file slot's owner must be a pointer")
+
+// HostSlot returns the offset of a free slot of size bytes in host file
+// h, which stays taken while owner is reachable. Once the collector finds
+// owner unreachable, a finalizer gives the slot back for a later call.
+// owner must point to the start of an object of its own, with no other
+// finalizer, as runtime.SetFinalizer requires.
+//
+// Which slot a call gets depends on when the collector ran, so it differs
+// from run to run: a run must use the offset only to read and write the
+// file.
+func HostSlot(h int, owner any, size int) (int64, error) {
+	if v := reflect.ValueOf(owner); v.Kind() != reflect.Pointer || v.IsNil() {
+		return 0, fmt.Errorf("%w: %T", ErrSlotOwner, owner)
+	}
+	hostMu.Lock()
+	defer hostMu.Unlock()
+	if _, ok := hostFiles[h]; !ok {
+		return 0, ErrNoHostFile
+	}
+	s := hostSlots[h]
+	if s == nil {
+		s = &slots{size: int64(size)}
+		hostSlots[h] = s
+	}
+	if s.size != int64(size) {
+		return 0, fmt.Errorf("%w: %d bytes, not %d", ErrSlotSize, size, s.size)
+	}
+	var off int64
+	if n := len(s.free); n > 0 {
+		off, s.free = s.free[n-1], s.free[:n-1]
+	} else {
+		off, s.end = s.end, s.end+s.size
+	}
+	// The finalizer runs on the collector's goroutine, outside the
+	// simulation; it only gives the slot back, under hostMu.
+	runtime.SetFinalizer(owner, func(any) { freeSlot(h, s, off) })
+	return off, nil
+}
+
+// freeSlot gives slot off of host file h back, if the file is still open.
+func freeSlot(h int, s *slots, off int64) {
+	hostMu.Lock()
+	defer hostMu.Unlock()
+	if hostSlots[h] == s {
+		s.free = append(s.free, off)
+	}
 }
 
 // HostClose closes host file h, which gives its space back.
@@ -95,6 +162,7 @@ func HostClose(h int) error {
 	hostMu.Lock()
 	f, ok := hostFiles[h]
 	delete(hostFiles, h)
+	delete(hostSlots, h)
 	hostMu.Unlock()
 	if !ok {
 		return ErrNoHostFile
