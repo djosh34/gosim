@@ -4,9 +4,11 @@ package metatesting
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -83,6 +85,50 @@ func TestStderrForwardFails(t *testing.T) {
 	defer func() { _ = r.fail(errTestDone) }()
 	if _, err := r.RunQuiet(&RunConfig{Test: "TestBad", Seed: 1}); !errors.Is(err, errNoRoom) {
 		t.Errorf("the run gave %v, want an error with %v", err, errNoRoom)
+	}
+}
+
+// errReader returns its lines, then err.
+type errReader struct {
+	lines string
+	err   error
+}
+
+func (r *errReader) Read(p []byte) (int, error) {
+	if r.lines == "" {
+		return 0, r.err
+	}
+	n := copy(p, r.lines)
+	r.lines = r.lines[n:]
+	return n, nil
+}
+
+// TestStderrLastError checks that an error at the end of stderr, with no
+// mark after it, reaches whoever waits on the marks.
+func TestStderrLastError(t *testing.T) {
+	errBroken := errors.New("broken pipe")
+	for _, c := range []struct {
+		name string
+		r    io.Reader
+		w    io.Writer
+		want error
+	}{
+		{"a read fails", &errReader{lines: "last words\n", err: errBroken}, io.Discard, errBroken},
+		{"a write fails", &errReader{lines: "last words\n", err: io.EOF}, failWriter{}, errNoRoom},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			forward = c.w
+			defer func() { forward = os.Stderr }()
+			marks := make(chan error, 1)
+			go forwardStderr(c.r, marks)
+			var got error
+			for e := range marks {
+				got = cmp.Or(got, e)
+			}
+			if !errors.Is(got, c.want) {
+				t.Errorf("got %v, want an error with %v", got, c.want)
+			}
+		})
 	}
 }
 

@@ -91,9 +91,13 @@ func (r *MetaT) fail(err error) error {
 	}
 	// Wait closes the stderr pipe, so the binary's last words, such as a
 	// panic, are forwarded first: the forwarder closes marks at the end.
-	for range r.marks {
+	var ferr error
+	for e := range r.marks {
+		if ferr == nil {
+			ferr = e
+		}
 	}
-	r.dead = fmt.Errorf("the test binary ended: %w", errors.Join(err, r.cmd.Wait()))
+	r.dead = fmt.Errorf("the test binary ended: %w", errors.Join(err, ferr, r.cmd.Wait()))
 	runnerMapMu.Lock()
 	if runnerMap[r.key] == r {
 		delete(runnerMap, r.key)
@@ -108,8 +112,9 @@ var forward io.Writer = os.Stderr
 
 // forwardStderr copies the lines of the test binary's stderr to forward,
 // each prefixed, and sends on marks for each result mark it reads, with
-// the first error of forward so far, and closes marks at the end of
-// stderr. After an error it forwards nothing more.
+// the first error of forward so far. At the end of stderr it sends that
+// error, or one of reading stderr, if there is one, and closes marks.
+// After an error it forwards nothing more.
 func forwardStderr(stderr io.Reader, marks chan<- error) {
 	defer close(marks)
 	var failed error
@@ -134,6 +139,13 @@ func forwardStderr(stderr io.Reader, marks chan<- error) {
 			marks <- failed
 		}
 		if err != nil {
+			if !errors.Is(err, io.EOF) && failed == nil {
+				failed = fmt.Errorf("reading the test binary's stderr: %w", err)
+			}
+			if failed != nil {
+				// The last error, which no mark carried.
+				marks <- failed
+			}
 			return
 		}
 	}
