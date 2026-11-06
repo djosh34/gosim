@@ -93,8 +93,9 @@ func WallLimitPassed() bool {
 
 // CPUTime returns the CPU time the process has used so far, user and
 // system, on all of its threads: the simulation's and the garbage
-// collector's. A simulation reads it to measure what its work costs; it
-// changes nothing in the run, and the run must not let it change anything.
+// collector's. A simulation reads it to measure what its work costs.
+// Reading it changes nothing in the run. Its value differs from run to
+// run, so the run must not act on it or log it.
 func CPUTime() (time.Duration, error) {
 	ns, err := gosimruntime.CPUTime()
 	return time.Duration(ns), err

@@ -39,6 +39,9 @@
 >   test binary whose run never yields: the run fails with what it saved and
 >   logged so far and every goroutine's stack (`gosim-stacks.txt`), and the
 >   next run starts a new binary.
+> - `gosim.CPUTime` returns the CPU time the whole process has used so far,
+>   user and system, on all threads. It counts earlier runs of the same
+>   binary too, so a caller takes the difference of two readings.
 > - A run copies its environment into a map, and each insert into a map of
 >   more than 4 entries draws from the run's random stream, so the number of
 >   `ExtraEnv` entries changes the run; pass the same variables every time.
