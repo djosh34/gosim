@@ -34,8 +34,9 @@
 >   `internal/cpu` is kept. The process's `GODEBUG` cpu options turn
 >   features off, as natively. On arm64 macOS translated code's
 >   `internal/cpu` still sees no features, so the paths it picks take Go
->   code there. A TLS 1.3 handshake picks ChaCha20-Poly1305
->   on every machine, so a run does not depend on the CPU.
+>   code there. A TLS 1.3 handshake picks AES-GCM on every
+>   machine, as Go does on a CPU with AES instructions, so a run does not
+>   depend on the CPU.
 > - A simulated program can pass data to the test that runs it with
 >   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
 >   `MetaT.RunQuiet` runs a test without logging its output.
