@@ -1,7 +1,9 @@
 package gosim
 
 import (
+	"errors"
 	"io"
+	"io/fs"
 	"time"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
@@ -105,8 +107,13 @@ func CPUTime() (time.Duration, error) {
 // A HostFile is a file on the disk of the machine that runs the
 // simulation, outside it, for a simulation that keeps more bytes than
 // memory holds. Its reads and writes go to the real disk at once and
-// change nothing in the run. It is closed when its run ends, if not
-// before.
+// change nothing in the run, unless the host's disk fails them. It is
+// closed when its run ends, if not before.
+//
+// A call on a closed HostFile fails with fs.ErrClosed, and a read at the
+// end with io.EOF. Other errors are the host's, which errors.Is cannot
+// match against the simulation's own os, io/fs and syscall errors: they
+// are for reports.
 type HostFile struct{ h int }
 
 // CreateHostFile makes an empty HostFile.
@@ -118,9 +125,18 @@ func CreateHostFile() (*HostFile, error) {
 	return &HostFile{h: h}, nil
 }
 
+// hostErr is err as the simulation sees it.
+func hostErr(err error) error {
+	if errors.Is(err, gosimruntime.ErrNoHostFile) {
+		return fs.ErrClosed
+	}
+	return err
+}
+
 // WriteAt writes p at offset off.
 func (f *HostFile) WriteAt(p []byte, off int64) (int, error) {
-	return gosimruntime.HostWriteAt(f.h, p, off)
+	n, err := gosimruntime.HostWriteAt(f.h, p, off)
+	return n, hostErr(err)
 }
 
 // ReadAt reads len(p) bytes at offset off, as io.ReaderAt does.
@@ -129,12 +145,12 @@ func (f *HostFile) ReadAt(p []byte, off int64) (int, error) {
 	if eof {
 		return n, io.EOF
 	}
-	return n, err
+	return n, hostErr(err)
 }
 
 // Close closes the file and gives its space back.
 func (f *HostFile) Close() error {
-	return gosimruntime.HostClose(f.h)
+	return hostErr(gosimruntime.HostClose(f.h))
 }
 
 // Stacks returns the stack of every goroutine of the process, the

@@ -15,6 +15,8 @@ import (
 // directory when it is made, so the disk gets its space back when the
 // file is closed, at the latest when its run ends.
 
+// hostMu guards the host files. One run at a time uses them, one goroutine
+// at a time, but the end of a run closes them from the scheduler's side.
 var (
 	hostMu    sync.Mutex
 	hostFiles = map[int]*os.File{}
@@ -22,7 +24,7 @@ var (
 )
 
 // ErrNoHostFile is the error of a call on a host file that is closed or
-// was never made.
+// was never made. The simulation sees it as its own fs.ErrClosed.
 var ErrNoHostFile = errors.New("gosim: no such host file")
 
 // HostCreate makes an empty host file in the directory of

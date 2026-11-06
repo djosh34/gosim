@@ -8,6 +8,7 @@ import (
 	"errors"
 	"hash/maphash"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -167,8 +168,11 @@ func TestHostFile(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.ReadAt(b, 0); err == nil {
-		t.Error("a closed host file read")
+	if _, err := f.ReadAt(b, 0); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("a read of a closed host file gave %v, want fs.ErrClosed", err)
+	}
+	if err := f.Close(); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("a second close gave %v, want fs.ErrClosed", err)
 	}
 }
 
