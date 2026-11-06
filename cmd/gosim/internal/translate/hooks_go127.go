@@ -32,14 +32,9 @@ var hooksGo127 = map[packageSelector]packageSelector{
 	{Pkg: "internal/bytealg", Selector: "abigen_runtime_memequal"}:        {Pkg: hooksGo127Package},
 	{Pkg: "internal/bytealg", Selector: "abigen_runtime_memequal_varlen"}: {Pkg: hooksGo127Package},
 
-	// arm only?
-	{Pkg: "internal/cpu", Selector: "getMIDR"}:  {Pkg: hooksGo127Package},
-	{Pkg: "internal/cpu", Selector: "getisar0"}: {Pkg: hooksGo127Package},
-
-	// amd only?
-	{Pkg: "internal/cpu", Selector: "cpuid"}:           {Pkg: hooksGo127Package},
-	{Pkg: "internal/cpu", Selector: "xgetbv"}:          {Pkg: hooksGo127Package},
-	{Pkg: "internal/cpu", Selector: "getGOAMD64level"}: {Pkg: hooksGo127Package},
+	// Declared by the overlay of internal/cpu (_overlay/internal/cpu).
+	{Pkg: "internal/cpu", Selector: "gosimHWCap"}:   {Pkg: hooksGo127Package},
+	{Pkg: "internal/cpu", Selector: "gosimGODEBUG"}: {Pkg: hooksGo127Package},
 
 	{Pkg: "internal/godebug", Selector: "registerMetric"}:      {Pkg: hooksGo127Package},
 	{Pkg: "internal/godebug", Selector: "setNewIncNonDefault"}: {Pkg: hooksGo127Package},

@@ -19,7 +19,12 @@ import (
 
 type Hash [32]byte
 
+// hashfile hashes the file at path, or its overlay (stdOverlay), which
+// may add a file that is not on disk.
 func hashfile(path string) (Hash, error) {
+	if b, ok := stdOverlay()[path]; ok {
+		return sha256.Sum256(b), nil
+	}
 	// XXX: cache?
 	bytes, err := os.ReadFile(path)
 	if err != nil {

@@ -28,8 +28,14 @@
 >   stopped. `gosim translate -unimplemented FILE` writes the list of them; the
 >   list differs between architectures. `gosim build-tests -allow-unimplemented
 >   FILE` fails when a test binary can reach a hook that FILE does not list.
-> - `gosim translate`, `test` and `build-tests` take `-tags`. Translation
->   always sets `purego`, so crypto uses its Go code instead of assembly.
+> - `gosim translate`, `test` and `build-tests` take `-tags`.
+> - Translated code sees the CPU's features (`internal/cpu`) of the machine
+>   it runs on, and the assembly of Go's crypto packages, `hash/crc32` and
+>   `internal/cpu` is kept. The process's `GODEBUG` cpu options turn
+>   features off, as natively. On arm64 macOS translated code's
+>   `internal/cpu` still sees no features, so the paths it picks take Go
+>   code there. A TLS 1.3 handshake picks ChaCha20-Poly1305
+>   on every machine, so a run does not depend on the CPU.
 > - A simulated program can pass data to the test that runs it with
 >   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
 >   `MetaT.RunQuiet` runs a test without logging its output.

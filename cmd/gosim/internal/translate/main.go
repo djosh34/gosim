@@ -42,8 +42,10 @@ var skippedPackagesGo127 = map[string]bool{
 	"runtime/metrics":  true, // XXX for now
 	"runtime/pprof":    true, // XXX for now
 
-	// XXX: rewrite internal/cpu to golang.org/x/sys/cpu?
-	"vendor/golang.org/x/sys/cpu": true, // XXX for now
+	// They read the CPU's features at init, which is the same for every
+	// simulation on a machine.
+	"vendor/golang.org/x/sys/cpu": true,
+	"golang.org/x/sys/cpu":        true,
 
 	"unique": true, // XXX: yes
 
@@ -56,22 +58,37 @@ var skippedPackagesGo127 = map[string]bool{
 	// reflectPackage: true,
 }
 
+// keepAsmPackagesGo127 are the packages whose assembly gosim keeps: the
+// translated package links the original assembly. Their assembly computes
+// on its arguments and reads no global that translation moves:
+// globalsDontTranslateGo127 keeps the tables it reads. One read goes to
+// another package: hash/crc32's amd64 assembly reads internal/cpu.X86,
+// which links to the runtime's own internal/cpu, not the simulation's.
+// The runtime fills it from the same CPUID and the same GODEBUG, so it
+// holds the same features. internal/cpu's assembly reads the CPU's
+// features, which pick the assembly of the others.
 var keepAsmPackagesGo127 = map[string]bool{
-	"crypto/aes":                                   true,
+	"internal/cpu": true,
+
 	"crypto/internal/boring/sig":                   true,
-	"crypto/internal/nistec":                       true,
+	"crypto/internal/fips140/aes":                  true,
+	"crypto/internal/fips140/aes/gcm":              true,
+	"crypto/internal/fips140/bigmod":               true,
+	"crypto/internal/fips140/edwards25519/field":   true,
+	"crypto/internal/fips140/nistec":               true,
+	"crypto/internal/fips140/sha256":               true,
+	"crypto/internal/fips140/sha3":                 true,
+	"crypto/internal/fips140/sha512":               true,
+	"crypto/internal/fips140/subtle":               true,
 	"crypto/md5":                                   true,
 	"crypto/sha1":                                  true,
-	"crypto/sha256":                                true,
-	"crypto/sha512":                                true,
-	"crypto/subtle":                                true,
-	"crypto/internal/bigmod":                       true,
-	"crypto/internal/edwards25519/field":           true,
-	"vendor/golang.org/x/crypto/chacha20":          true,
-	"vendor/golang.org/x/crypto/internal/poly1305": true,
-	"vendor/golang.org/x/crypto/chacha20poly1305":  true,
-	"vendor/golang.org/x/crypto/sha3":              true,
 	"hash/crc32":                                   true,
+	"vendor/golang.org/x/crypto/chacha20":          true,
+	"vendor/golang.org/x/crypto/chacha20poly1305":  true,
+	"vendor/golang.org/x/crypto/internal/poly1305": true,
+	"golang.org/x/crypto/chacha20":                 true,
+	"golang.org/x/crypto/chacha20poly1305":         true,
+	"golang.org/x/crypto/internal/poly1305":        true,
 
 	"net/url":  true, // XXX: linkname setpath nonsense
 	"net/http": true, // XXX: linkname roundtrip nonsense
@@ -135,9 +152,7 @@ func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.Load
 
 	// apply build config to packages config
 	// TODO: build tags plan (rename files, force GOOS and GOARCH)
-	// purego selects the Go implementations of crypto and other packages
-	// over their assembly, which gosim cannot translate.
-	tags := []string{"sim", "purego"}
+	tags := []string{"sim"}
 	if b.Race {
 		tags = append(tags, "race")
 	}
