@@ -4,11 +4,6 @@
 
 package gosimruntime
 
-import (
-	"encoding/binary"
-	"math"
-)
-
 type (
 	fnv64 uint64
 )
@@ -36,22 +31,8 @@ func (s *fnv64) Hash(data []byte) {
 	*s = hash
 }
 
-func (s *fnv64) HashInt(data uint64) {
-	switch {
-	case data == 0:
-	case data < math.MaxUint8:
-		s.Hash([]byte{uint8(data)})
-	case data < math.MaxUint16:
-		var n [2]byte
-		binary.LittleEndian.PutUint16(n[:], uint16(data))
-		s.Hash(n[:])
-	case data < math.MaxUint32:
-		var n [4]byte
-		binary.LittleEndian.PutUint32(n[:], uint32(data))
-		s.Hash(n[:])
-	default:
-		var n [8]byte
-		binary.LittleEndian.PutUint64(n[:], data)
-		s.Hash(n[:])
-	}
+// HashWord hashes w as one 64-bit word: one multiplication instead of
+// one per byte.
+func (s *fnv64) HashWord(w uint64) {
+	*s = (*s ^ fnv64(w)) * prime64
 }
