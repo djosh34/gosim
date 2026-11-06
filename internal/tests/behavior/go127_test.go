@@ -5,8 +5,10 @@ package behavior
 import (
 	"context"
 	"embed"
+	"errors"
 	"hash/maphash"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -141,6 +143,36 @@ func TestCPUTime(t *testing.T) {
 		if now > before {
 			return
 		}
+	}
+}
+
+// TestHostFile writes bytes to a file on the host and reads them back.
+func TestHostFile(t *testing.T) {
+	f, err := gosim.CreateHostFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteAt([]byte("hello, host"), 3); err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, 11)
+	if _, err := f.ReadAt(b, 3); err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != "hello, host" {
+		t.Errorf("read %q back", b)
+	}
+	if _, err := f.ReadAt(b, 20); !errors.Is(err, io.EOF) {
+		t.Errorf("a read past the end gave %v, want io.EOF", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.ReadAt(b, 0); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("a read of a closed host file gave %v, want fs.ErrClosed", err)
+	}
+	if err := f.Close(); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("a second close gave %v, want fs.ErrClosed", err)
 	}
 }
 
