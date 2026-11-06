@@ -32,8 +32,9 @@
 > - Translated code sees the CPU's features (`internal/cpu`) of the machine
 >   it runs on, and the assembly of Go's crypto packages, `hash/crc32` and
 >   `internal/cpu` is kept. The process's `GODEBUG` cpu options turn
->   features off, as natively. This holds on Linux; on macOS translated
->   code still sees no features, and its crypto takes the Go paths. A TLS 1.3 handshake picks ChaCha20-Poly1305
+>   features off, as natively. On arm64 macOS translated code's
+>   `internal/cpu` still sees no features, so the paths it picks take Go
+>   code there. A TLS 1.3 handshake picks ChaCha20-Poly1305
 >   on every machine, so a run does not depend on the CPU.
 > - A simulated program can pass data to the test that runs it with
 >   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
