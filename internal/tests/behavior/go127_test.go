@@ -127,6 +127,23 @@ func TestWriteArtifact(t *testing.T) {
 	gosim.WriteArtifact("artifact.txt", []byte("hello"))
 }
 
+// TestCPUTime reads the process's CPU time from inside a run.
+func TestCPUTime(t *testing.T) {
+	before, err := gosim.CPUTime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		now, err := gosim.CPUTime()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if now > before {
+			return
+		}
+	}
+}
+
 // TestWallLimit waits, on the simulated clock, until its limit of real
 // time passed, and saves every goroutine's stack.
 func TestWallLimit(t *testing.T) {
