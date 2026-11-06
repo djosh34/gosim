@@ -1,6 +1,7 @@
 package gosim
 
 import (
+	"io"
 	"time"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
@@ -99,6 +100,41 @@ func WallLimitPassed() bool {
 func CPUTime() (time.Duration, error) {
 	ns, err := gosimruntime.CPUTime()
 	return time.Duration(ns), err
+}
+
+// A HostFile is a file on the disk of the machine that runs the
+// simulation, outside it, for a simulation that keeps more bytes than
+// memory holds. Its reads and writes go to the real disk at once and
+// change nothing in the run. It is closed when its run ends, if not
+// before.
+type HostFile struct{ h int }
+
+// CreateHostFile makes an empty HostFile.
+func CreateHostFile() (*HostFile, error) {
+	h, err := gosimruntime.HostCreate()
+	if err != nil {
+		return nil, err
+	}
+	return &HostFile{h: h}, nil
+}
+
+// WriteAt writes p at offset off.
+func (f *HostFile) WriteAt(p []byte, off int64) (int, error) {
+	return gosimruntime.HostWriteAt(f.h, p, off)
+}
+
+// ReadAt reads len(p) bytes at offset off, as io.ReaderAt does.
+func (f *HostFile) ReadAt(p []byte, off int64) (int, error) {
+	n, eof, err := gosimruntime.HostReadAt(f.h, p, off)
+	if eof {
+		return n, io.EOF
+	}
+	return n, err
+}
+
+// Close closes the file and gives its space back.
+func (f *HostFile) Close() error {
+	return gosimruntime.HostClose(f.h)
 }
 
 // Stacks returns the stack of every goroutine of the process, the

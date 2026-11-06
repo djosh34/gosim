@@ -408,6 +408,9 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
 	if runErr == ErrMainReturned {
 		runErr = nil
 	}
+	if err := closeHostFiles(); err != nil && runErr == nil {
+		runErr = err
+	}
 	if runErr == ErrUnimplemented || runErr == ErrFatal {
 		runErr = fmt.Errorf("%w: %s", runErr, scheduler.abortDetail)
 	}
