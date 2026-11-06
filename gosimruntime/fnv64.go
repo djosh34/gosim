@@ -32,10 +32,10 @@ func (s *fnv64) Hash(data []byte) {
 }
 
 // HashWord hashes w as one 64-bit word: one multiplication instead of
-// one per byte. A multiplication carries a bit only upward, so w's top
-// half is folded into its bottom half first; otherwise two words that
-// differ only in bit 63 would cancel each other.
+// one per byte. A multiplication carries a bit only upward, so the sum's
+// top half is folded into its bottom half after it; otherwise two words
+// whose differences end in bit 63 alone would cancel each other.
 func (s *fnv64) HashWord(w uint64) {
-	w ^= w >> 32
-	*s = (*s ^ fnv64(w)) * prime64
+	h := (*s ^ fnv64(w)) * prime64
+	*s = h ^ h>>32
 }

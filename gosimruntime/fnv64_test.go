@@ -2,8 +2,8 @@ package gosimruntime
 
 import "testing"
 
-// TestHashWordTopBit checks that two words that differ only in bit 63 do
-// not cancel each other.
+// TestHashWordTopBit checks that two words that differ in bit 63, alone or
+// with bit 31, do not cancel each other.
 func TestHashWordTopBit(t *testing.T) {
 	sum := func(ws ...uint64) uint64 {
 		h := newFnv64()
@@ -12,7 +12,9 @@ func TestHashWordTopBit(t *testing.T) {
 		}
 		return h.Sum()
 	}
-	if sum(0, 7, 123456, 99) == sum(0, 7|1<<63, 123456, 99|1<<63) {
-		t.Error("two differences in bit 63 cancel")
+	for _, d := range []uint64{1 << 63, 1<<63 | 1<<31} {
+		if sum(0, 7, 123456, 99) == sum(0, 7^d, 123456, 99^d) {
+			t.Errorf("two differences of %#x cancel", d)
+		}
 	}
 }
