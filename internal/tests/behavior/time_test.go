@@ -390,3 +390,20 @@ func TestTimeTickerNonBlocking(t *testing.T) {
 		t.Error(start, v)
 	}
 }
+
+// TestTimerAfterFuncBlocks checks that an AfterFunc that blocks holds
+// back no timer that fires after it: each AfterFunc runs on a goroutine of
+// its own, as in Go, though the timers' calls share one.
+func TestTimerAfterFuncBlocks(t *testing.T) {
+	a := time.Now()
+	never := make(chan struct{})
+	time.AfterFunc(time.Second, func() { <-never })
+	later := time.NewTimer(2 * time.Second)
+	done := make(chan struct{})
+	time.AfterFunc(3*time.Second, func() { close(done) })
+	<-later.C
+	<-done
+	if d := time.Since(a); d != 3*time.Second {
+		t.Errorf("the timers after a blocked AfterFunc fired after %v, want 3s", d)
+	}
+}
