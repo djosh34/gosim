@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/race"
 )
 
 // TODO: test these against real behavior with some slack built in for time
@@ -405,5 +408,27 @@ func TestTimerAfterFuncBlocks(t *testing.T) {
 	<-done
 	if d := time.Since(a); d != 3*time.Second {
 		t.Errorf("the timers after a blocked AfterFunc fired after %v, want 3s", d)
+	}
+}
+
+// TestTimersStartNoGoroutine checks that a timer that fires starts no
+// goroutine, outside race builds: one goroutine per machine runs the
+// timers' calls. A goroutine started after 20 firings has an ID close to
+// one started before them.
+func TestTimersStartNoGoroutine(t *testing.T) {
+	if race.Enabled {
+		t.Skip("race builds run each timer call on a goroutine of its own")
+	}
+	id := func() int {
+		c := make(chan int)
+		go func() { c <- gosimruntime.GetGoroutine() }()
+		return <-c
+	}
+	before := id()
+	for range 20 {
+		<-time.NewTimer(time.Millisecond).C
+	}
+	if after := id(); after-before > 5 {
+		t.Errorf("20 timers that fired started %d goroutines", after-before-1)
 	}
 }

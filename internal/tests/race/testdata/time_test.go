@@ -75,6 +75,25 @@ func TestRaceTimer2(t *testing.T) {
 	<-done
 }
 
+// TestRaceTimer2Reset is TestRaceTimer2 with another timer reset after
+// the racing write and firing at the same time: its firing must not order
+// the write before the AfterFunc (djosh34/gosim#8).
+func TestRaceTimer2Reset(t *testing.T) {
+	var x int
+	_ = x
+
+	done := make(chan struct{})
+	early := time.NewTimer(10 * time.Millisecond)
+	time.AfterFunc(10*time.Millisecond, func() {
+		x = 2
+		close(done)
+	})
+	x = 1
+	early.Reset(10 * time.Millisecond)
+
+	<-done
+}
+
 func TestRaceTicker1(t *testing.T) {
 	// little song and dance to make sure we can read timer.C without racing
 	timer := time.NewTicker(10 * time.Millisecond)

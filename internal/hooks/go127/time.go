@@ -45,18 +45,22 @@ func fireRuntimeTimer(t *gosimruntime.Timer) {
 	arg := rt.arg
 	seq := rt.seq
 
-	// Go's timer functions never block (RunFromTimerHandler), so one
-	// goroutine per machine runs them.
-	gosimruntime.RunFromTimerHandler(func() {
+	call := func() {
 		// TODO: in mean mode, insert delay here?
 		if race.Enabled {
 			race.Acquire(unsafe.Pointer(rt))
 		}
 		delta := int64(0) // TODO: adjust?
 		f(arg, seq, delta)
-		// FIXME: this might be borked; standard library expects to run
-		// atomically instead of in a goroutine?
-	}, machine)
+	}
+	if race.Enabled {
+		// Each call keeps a race context of its own (RunFromTimerHandler).
+		gosimruntime.GoFromTimerHandler(call, machine)
+	} else {
+		// Go's timer functions never block, so one goroutine per machine
+		// runs them.
+		gosimruntime.RunFromTimerHandler(call, machine)
+	}
 
 	if rt.period != 0 {
 		// FIXME: this might be borked; base off now?
