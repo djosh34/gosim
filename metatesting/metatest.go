@@ -143,7 +143,8 @@ func forwardStderr(stderr io.Reader, marks chan<- error) {
 				failed = fmt.Errorf("reading the test binary's stderr: %w", err)
 			}
 			if failed != nil {
-				// The last error, which no mark carried.
+				// The error once more, for a write error that no mark
+				// carried, or a read error.
 				marks <- failed
 			}
 			return
