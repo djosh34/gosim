@@ -59,10 +59,14 @@ var skippedPackagesGo127 = map[string]bool{
 }
 
 // keepAsmPackagesGo127 are the packages whose assembly gosim keeps: the
-// translated package links the original assembly. Their assembly only
-// computes on its arguments, and reads no global that translation moves
-// (globalsDontTranslateGo127 keeps the tables it reads). internal/cpu's
-// reads the CPU's features, which pick the assembly of the others.
+// translated package links the original assembly. Their assembly computes
+// on its arguments and reads no global that translation moves:
+// globalsDontTranslateGo127 keeps the tables it reads. One read goes to
+// another package: hash/crc32's amd64 assembly reads internal/cpu.X86,
+// which links to the runtime's own internal/cpu, not the simulation's.
+// The runtime fills it from the same CPUID and the same GODEBUG, so it
+// holds the same features. internal/cpu's assembly reads the CPU's
+// features, which pick the assembly of the others.
 var keepAsmPackagesGo127 = map[string]bool{
 	"internal/cpu": true,
 

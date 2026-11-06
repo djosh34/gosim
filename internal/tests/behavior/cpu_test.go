@@ -69,8 +69,9 @@ func TestXCryptoChaCha20(t *testing.T) {
 	}
 }
 
-// TestCRC32 checks that the assembly of hash/crc32 gives the checksums of
-// its tables.
+// TestCRC32 checks that hash/crc32, whose assembly gosim keeps, gives
+// the check values of both tables. The Go code gives them too, so this
+// does not show that the assembly runs.
 func TestCRC32(t *testing.T) {
 	for _, c := range []struct {
 		poly uint32
