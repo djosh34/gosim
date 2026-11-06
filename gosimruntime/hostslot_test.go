@@ -79,6 +79,13 @@ func TestHostSlots(t *testing.T) {
 	if _, err := HostSlot(h, (*owner)(nil), 4096); !errors.Is(err, ErrSlotOwner) {
 		t.Errorf("a nil owner: %v, want %v", err, ErrSlotOwner)
 	}
+	// Every object of no bytes has one address, which never becomes
+	// garbage, so its slot would never come back.
+	for _, o := range []any{new(struct{}), &[0]byte{}} {
+		if _, err := HostSlot(h, o, 4096); !errors.Is(err, ErrSlotOwner) {
+			t.Errorf("an owner of no bytes, %T: %v, want %v", o, err, ErrSlotOwner)
+		}
+	}
 	if _, err := HostSlot(h+1000, &owner{}, 4096); !errors.Is(err, ErrNoHostFile) {
 		t.Errorf("a slot of a file that is not open: %v, want %v", err, ErrNoHostFile)
 	}

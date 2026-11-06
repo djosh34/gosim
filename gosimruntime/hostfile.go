@@ -107,9 +107,10 @@ func closeHostFiles() error {
 // the host file's first slot's.
 var ErrSlotSize = errors.New("gosim: a host file's slots all have one size, of at least a byte")
 
-// ErrSlotOwner is the error of a slot whose owner is not a pointer, or is
-// nil.
-var ErrSlotOwner = errors.New("gosim: a host file slot's owner must be a pointer that is not nil")
+// ErrSlotOwner is the error of a slot whose owner is not a pointer, is
+// nil, or points to an object of no bytes: every such object has the same
+// address, which never becomes garbage.
+var ErrSlotOwner = errors.New("gosim: a host file slot's owner must be a pointer, not nil, to an object of at least a byte")
 
 // HostSlot returns the offset of a free slot of size bytes in host file
 // h, which stays taken while owner is reachable. Once the collector finds
@@ -124,7 +125,7 @@ var ErrSlotOwner = errors.New("gosim: a host file slot's owner must be a pointer
 // only bytes it wrote there since the slot was handed out.
 func HostSlot(h int, owner any, size int) (int64, error) {
 	v := reflect.ValueOf(owner)
-	if v.Kind() != reflect.Pointer || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() || v.Type().Elem().Size() == 0 {
 		return 0, fmt.Errorf("%w: %T", ErrSlotOwner, owner)
 	}
 	if size <= 0 {
