@@ -3,6 +3,7 @@
 package behavior
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -15,6 +16,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/chacha20"
 
 	"github.com/jellevandenhooff/gosim"
 )
@@ -47,6 +50,22 @@ func TestAcceleratedAESGCM(t *testing.T) {
 	}
 	if took := after - before; took > 100*time.Millisecond {
 		t.Errorf("sealing 32 MiB with AES-GCM took %v of CPU time: no AES instructions?", took)
+	}
+}
+
+// TestXCryptoChaCha20 runs golang.org/x/crypto's ChaCha20, whose
+// assembly gosim keeps, as the standard library's vendored copy.
+func TestXCryptoChaCha20(t *testing.T) {
+	c, err := chacha20.NewUnauthenticatedCipher(make([]byte, chacha20.KeySize), make([]byte, chacha20.NonceSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := make([]byte, 256)
+	c.XORKeyStream(out, out)
+	// The first bytes of the keystream for the zero key and nonce, from
+	// RFC 8439's test vector 1.
+	if want := []byte{0x76, 0xb8, 0xe0, 0xad, 0xa0, 0xf1, 0x3d, 0x90}; !bytes.Equal(out[:8], want) {
+		t.Errorf("keystream starts %x, want %x", out[:8], want)
 	}
 }
 

@@ -42,8 +42,10 @@ var skippedPackagesGo127 = map[string]bool{
 	"runtime/metrics":  true, // XXX for now
 	"runtime/pprof":    true, // XXX for now
 
-	// XXX: rewrite internal/cpu to golang.org/x/sys/cpu?
-	"vendor/golang.org/x/sys/cpu": true, // XXX for now
+	// They read the CPU's features at init, which is the same for every
+	// simulation on a machine.
+	"vendor/golang.org/x/sys/cpu": true,
+	"golang.org/x/sys/cpu":        true,
 
 	"unique": true, // XXX: yes
 
@@ -80,6 +82,9 @@ var keepAsmPackagesGo127 = map[string]bool{
 	"vendor/golang.org/x/crypto/chacha20":          true,
 	"vendor/golang.org/x/crypto/chacha20poly1305":  true,
 	"vendor/golang.org/x/crypto/internal/poly1305": true,
+	"golang.org/x/crypto/chacha20":                 true,
+	"golang.org/x/crypto/chacha20poly1305":         true,
+	"golang.org/x/crypto/internal/poly1305":        true,
 
 	"net/url":  true, // XXX: linkname setpath nonsense
 	"net/http": true, // XXX: linkname roundtrip nonsense
