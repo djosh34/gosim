@@ -1,10 +1,12 @@
 package metatesting
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -66,6 +68,9 @@ type MetaT struct {
 
 	w *json.Encoder
 	r *json.Decoder
+	// marks gets a value each time the forwarded stderr reaches a result
+	// mark, and is closed when stderr ends.
+	marks chan struct{}
 
 	// key is the MetaT's key in runnerMap, and dead the error that ended
 	// its test binary, after which ForOtherPackage starts a new one.
@@ -92,29 +97,32 @@ func (r *MetaT) fail(err error) error {
 	return r.dead
 }
 
-type prefixer struct {
-	out    *os.File
-	prefix string
-}
+// forward is where a MetaT's test binary's stderr goes, each line
+// prefixed: os.Stderr, or what a test sets.
+var forward io.Writer = os.Stderr
 
-func (w prefixer) Write(b []byte) (n int, err error) {
-	n = len(b)
-	for len(b) > 0 {
-		end := bytes.IndexByte(b, '\n')
-		if end == -1 {
-			end = len(b)
-		} else {
-			end++
+// forwardStderr copies the lines of the test binary's stderr to forward,
+// each prefixed, and sends on marks for each result mark it reads, and
+// closes marks at the end of stderr.
+func forwardStderr(stderr io.Reader, marks chan<- struct{}) {
+	defer close(marks)
+	r := bufio.NewReader(stderr)
+	for {
+		line, err := r.ReadString('\n')
+		if strings.TrimSuffix(line, "\n") == gosimruntime.MetatestResultMark {
+			marks <- struct{}{}
+		} else if line != "" {
+			if !strings.HasSuffix(line, "\n") {
+				line += "\n"
+			}
+			// A failed write leaves the line out; the run's result still
+			// comes back.
+			_, _ = io.WriteString(forward, "metatest binary: "+line)
 		}
-		line := b[:end]
-		w.out.WriteString(w.prefix)
-		w.out.Write(line)
-		if line[len(line)-1] != '\n' {
-			w.out.WriteString("\n")
+		if err != nil {
+			return
 		}
-		b = b[end:]
 	}
-	return
 }
 
 func newRunner(path string) (*MetaT, error) {
@@ -127,14 +135,16 @@ func newRunner(path string) (*MetaT, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: Do not discard, and disable the formatted output print in gosimruntime instead
-	// TODO: Prefix output to help identify stray logging?
-	cmd.Stderr = &prefixer{out: os.Stderr, prefix: "metatest binary: "}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	marks := make(chan struct{}, 1)
+	go forwardStderr(stderr, marks)
 
 	w := json.NewEncoder(stdin)
 	r := json.NewDecoder(stdout)
@@ -142,9 +152,16 @@ func newRunner(path string) (*MetaT, error) {
 	return &MetaT{
 		cmd: cmd,
 
-		w: w,
-		r: r,
+		w:     w,
+		r:     r,
+		marks: marks,
 	}, nil
+}
+
+// waitStderr waits until the test binary's stderr up to the mark of the
+// result just read is forwarded, or stderr ended.
+func (r *MetaT) waitStderr() {
+	<-r.marks
 }
 
 // TODO: Support match expressions?
@@ -159,6 +176,7 @@ func (r *MetaT) ListTests() ([]string, error) {
 	if err := r.r.Decode(&tests); err != nil {
 		return nil, err
 	}
+	r.waitStderr()
 
 	return tests, nil
 }
@@ -240,6 +258,7 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 		// TODO: Print results that fail to decode
 		return nil, r.fail(err)
 	}
+	r.waitStderr()
 	if result.Ended {
 		r.fail(errEnded)
 	}
