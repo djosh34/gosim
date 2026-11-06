@@ -26,6 +26,13 @@ var errTestDone = errors.New("the test is done")
 const fakeBinary = "GOSIM_FAKE_METATEST"
 
 func TestMain(m *testing.M) {
+	if os.Getenv(fakeBinary) == "dies" {
+		// A binary that crashes: it writes a lot, then ends with no result.
+		for i := range 200 {
+			fmt.Fprintf(os.Stderr, "dying line %d\n", i)
+		}
+		os.Exit(2)
+	}
 	if os.Getenv(fakeBinary) != "" {
 		in := json.NewDecoder(os.Stdin)
 		out := json.NewEncoder(os.Stdout)
@@ -46,14 +53,15 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// slowWriter keeps what it is given, each write after a delay.
+// slowWriter keeps what it is given, each write after delay, or 200 ms.
 type slowWriter struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
+	mu    sync.Mutex
+	buf   bytes.Buffer
+	delay time.Duration
 }
 
 func (w *slowWriter) Write(p []byte) (int, error) {
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(cmp.Or(w.delay, 200*time.Millisecond))
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.buf.Write(p)
@@ -129,6 +137,27 @@ func TestStderrLastError(t *testing.T) {
 				t.Errorf("got %v, want an error with %v", got, c.want)
 			}
 		})
+	}
+}
+
+// TestStderrOfDyingBinary checks that what a binary wrote before it died
+// is forwarded whole, before the runner waits for it.
+func TestStderrOfDyingBinary(t *testing.T) {
+	t.Setenv(fakeBinary, "dies")
+	// Slow enough that the binary has died long before its lines are
+	// forwarded.
+	w := &slowWriter{delay: 5 * time.Millisecond}
+	forward = w
+	defer func() { forward = os.Stderr }()
+	r, err := newRunner(os.Args[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RunQuiet(&RunConfig{Test: "TestBad", Seed: 1}); err == nil {
+		t.Fatal("a binary that died gave a result")
+	}
+	if got := w.String(); !strings.Contains(got, "metatest binary: dying line 199\n") {
+		t.Errorf("the binary's last line was not forwarded; got %d bytes", len(got))
 	}
 }
 
