@@ -48,6 +48,10 @@
 > - `gosim.CPUTime` returns the CPU time the whole process has used so far,
 >   user and system, on all threads. It counts earlier runs of the same
 >   binary too, so a caller takes the difference of two readings.
+> - `gosim.CreateHostFile` gives a simulation a file on the disk of the
+>   machine that runs it, outside the simulation, for more bytes than memory
+>   holds. Its reads and writes change nothing in the run, unless the host's
+>   disk fails them; it is closed when the run ends, if not before.
 > - A run copies its environment into a map, and each insert into a map of
 >   more than 4 entries draws from the run's random stream, so the number of
 >   `ExtraEnv` entries changes the run; pass the same variables every time.
