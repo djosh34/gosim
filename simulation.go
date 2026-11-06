@@ -91,6 +91,16 @@ func WallLimitPassed() bool {
 	return gosimruntime.WallLimitPassed()
 }
 
+// CPUTime returns the CPU time the process has used so far, user and
+// system, on all of its threads: the simulation's and the garbage
+// collector's. A simulation reads it to measure what its work costs.
+// Reading it changes nothing in the run. Its value differs from run to
+// run, so the run must not act on it or log it.
+func CPUTime() (time.Duration, error) {
+	ns, err := gosimruntime.CPUTime()
+	return time.Duration(ns), err
+}
+
 // Stacks returns the stack of every goroutine of the process, the
 // simulation's included, for the report of a run that went on too long.
 func Stacks() []byte {
