@@ -24,6 +24,8 @@ func Nanotime() int64 {
 type clock struct {
 	now  int64 // unix nsec
 	heap *timerHeap
+	// fired counts the timers that fired so far (TimerFirings).
+	fired uint64
 }
 
 func newClock() *clock {
@@ -46,6 +48,7 @@ func (c *clock) maybefire() (*Timer, bool) {
 	}
 	if c.heap.peek().when <= c.now {
 		e := c.heap.pop()
+		c.fired++
 		return e, true
 	}
 	return nil, false
@@ -63,6 +66,16 @@ func (c *clock) doadvance() {
 	if checksummer := gs.get().checksummer; checksummer != nil {
 		checksummer.recordIntInt(checksumKeyTimeNow, uint64(c.now), 0)
 	}
+}
+
+// TimerFirings returns how many timers fired in this run so far: each
+// wake-up of a goroutine from time.Sleep, each send on a timer's channel
+// and each call of an AfterFunc. A simulation reads it to count how often
+// its code wakes up on time. Reading it changes nothing in the run.
+//
+//go:norace
+func TimerFirings() uint64 {
+	return gs.get().clock.fired
 }
 
 func (c *clock) removemachine(m *Machine) {
