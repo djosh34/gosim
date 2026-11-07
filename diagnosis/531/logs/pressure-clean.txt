@@ -1,0 +1,503 @@
+
+tick=0 pid=2732179
+State:	S (sleeping)
+VmRSS:	   53924 kB
+VmSwap:	       0 kB
+memory.current: 58728448
+memory.events: low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: 0
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+
+tick=1 pid=2732179
+State:	S (sleeping)
+VmRSS:	  426548 kB
+VmSwap:	       0 kB
+memory.current: 440098816
+memory.events: low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: ep_poll
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: 0
+2732203: futex_wait_queue
+
+tick=2 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1231124 kB
+VmSwap:	       0 kB
+memory.current: 1265614848
+memory.events: low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: mempool_alloc
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=3 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1701312 kB
+VmSwap:	       0 kB
+memory.current: 1748623360
+memory.events: low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: 0
+
+tick=4 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850712 kB
+VmSwap:	       0 kB
+memory.current: 1899900928
+memory.events: low 0
+high 3646
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: 0
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=5 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850700 kB
+VmSwap:	       0 kB
+memory.current: 1899905024
+memory.events: low 0
+high 8736
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: folio_wait_bit_common
+
+tick=6 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850744 kB
+VmSwap:	       0 kB
+memory.current: 1899683840
+memory.events: low 0
+high 14267
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=7 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850776 kB
+VmSwap:	       0 kB
+memory.current: 1899876352
+memory.events: low 0
+high 18452
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: folio_wait_bit_common
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=8 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850716 kB
+VmSwap:	       0 kB
+memory.current: 1900097536
+memory.events: low 0
+high 23081
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: folio_wait_bit_common
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: folio_wait_bit_common
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=9 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850692 kB
+VmSwap:	       0 kB
+memory.current: 1899720704
+memory.events: low 0
+high 27710
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: 0
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: 0
+
+tick=10 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850652 kB
+VmSwap:	       0 kB
+memory.current: 1899810816
+memory.events: low 0
+high 31877
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: 0
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=11 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850648 kB
+VmSwap:	       0 kB
+memory.current: 1899646976
+memory.events: low 0
+high 36546
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: 0
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: 0
+
+tick=12 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850688 kB
+VmSwap:	       0 kB
+memory.current: 1900032000
+memory.events: low 0
+high 40519
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: 0
+
+tick=13 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850656 kB
+VmSwap:	       0 kB
+memory.current: 1899724800
+memory.events: low 0
+high 44989
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=14 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850708 kB
+VmSwap:	       0 kB
+memory.current: 1899667456
+memory.events: low 0
+high 49363
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=15 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850676 kB
+VmSwap:	       0 kB
+memory.current: 1899819008
+memory.events: low 0
+high 53257
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: folio_wait_bit_common
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: folio_wait_bit_common
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=16 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850648 kB
+VmSwap:	       0 kB
+memory.current: 1899921408
+memory.events: low 0
+high 56982
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: folio_wait_bit_common
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: folio_wait_bit_common
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=17 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850672 kB
+VmSwap:	       0 kB
+memory.current: 1900400640
+memory.events: low 0
+high 59637
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: 0
+2732188: 0
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=18 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850792 kB
+VmSwap:	       0 kB
+memory.current: 1899737088
+memory.events: low 0
+high 63744
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=19 pid=2732179
+State:	S (sleeping)
+VmRSS:	 1850664 kB
+VmSwap:	       0 kB
+memory.current: 1899778048
+memory.events: low 0
+high 68330
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: futex_wait_queue
+2732187: hrtimer_nanosleep
+2732188: 0
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: futex_wait_queue
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=20 pid=2732179
+State:	D (disk sleep)
+VmRSS:	 1850664 kB
+VmSwap:	       0 kB
+memory.current: 1900806144
+memory.events: low 0
+high 74196
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: folio_wait_bit_common
+2732187: futex_wait_queue
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=21 pid=2732179
+State:	R (running)
+VmRSS:	 1850768 kB
+VmSwap:	       0 kB
+memory.current: 1899982848
+memory.events: low 0
+high 80002
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: 0
+2732187: futex_wait_queue
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: folio_wait_bit_common
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue
+
+tick=22 pid=2732179
+State:	R (running)
+VmRSS:	 1850652 kB
+VmSwap:	       0 kB
+memory.current: 1899888640
+memory.events: low 0
+high 86303
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+2732179: 0
+2732187: futex_wait_queue
+2732188: futex_wait_queue
+2732189: futex_wait_queue
+2732190: futex_wait_queue
+2732192: 0
+2732193: futex_wait_queue
+2732198: futex_wait_queue
+2732199: futex_wait_queue
+2732203: futex_wait_queue

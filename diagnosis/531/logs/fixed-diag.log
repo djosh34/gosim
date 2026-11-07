@@ -1,0 +1,502 @@
+Running scope as unit: run-r9d82bb4b5d9942db80fde50dac898c04.scope
+DIAG completed=25 semas=0 empty=0 globalsize=33779384
+DIAG completed=50 semas=0 empty=0 globalsize=33779384
+DIAG completed=75 semas=0 empty=0 globalsize=33779384
+DIAG completed=100 semas=0 empty=0 globalsize=33779384
+DIAG completed=125 semas=0 empty=0 globalsize=33779384
+DIAG completed=150 semas=0 empty=0 globalsize=33779384
+DIAG completed=175 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 1)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=200 semas=0 empty=0 globalsize=33779384
+DIAG completed=225 semas=1 empty=1 globalsize=33779384
+DIAG completed=250 semas=1 empty=1 globalsize=33779384
+DIAG completed=275 semas=1 empty=1 globalsize=33779384
+DIAG completed=300 semas=1 empty=1 globalsize=33779384
+DIAG completed=325 semas=1 empty=1 globalsize=33779384
+DIAG completed=350 semas=1 empty=1 globalsize=33779384
+DIAG completed=375 semas=1 empty=1 globalsize=33779384
+DIAG completed=400 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 2)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=425 semas=1 empty=1 globalsize=33779384
+DIAG completed=450 semas=0 empty=0 globalsize=33779384
+DIAG completed=475 semas=0 empty=0 globalsize=33779384
+DIAG completed=500 semas=0 empty=0 globalsize=33779384
+DIAG tick=1 runs=510 heap=69309832 live=70246400 total=34928246888 gc=513 goroutines=2
+DIAG completed=525 semas=0 empty=0 globalsize=33779384
+DIAG completed=550 semas=0 empty=0 globalsize=33779384
+DIAG completed=575 semas=0 empty=0 globalsize=33779384
+DIAG completed=600 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 3)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=625 semas=0 empty=0 globalsize=33779384
+DIAG completed=650 semas=0 empty=0 globalsize=33779384
+DIAG completed=675 semas=0 empty=0 globalsize=33779384
+DIAG completed=700 semas=0 empty=0 globalsize=33779384
+DIAG completed=725 semas=0 empty=0 globalsize=33779384
+DIAG completed=750 semas=0 empty=0 globalsize=33779384
+DIAG completed=775 semas=0 empty=0 globalsize=33779384
+DIAG completed=800 semas=0 empty=0 globalsize=33779384
+DIAG completed=825 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 4)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=850 semas=0 empty=0 globalsize=33779384
+DIAG completed=875 semas=1 empty=1 globalsize=33779384
+DIAG completed=900 semas=1 empty=1 globalsize=33779384
+DIAG completed=925 semas=1 empty=1 globalsize=33779384
+DIAG completed=950 semas=1 empty=1 globalsize=33779384
+DIAG completed=975 semas=1 empty=1 globalsize=33779384
+DIAG completed=1000 semas=1 empty=1 globalsize=33779384
+DIAG completed=1025 semas=1 empty=1 globalsize=33779384
+DIAG tick=2 runs=1041 heap=137248280 live=138158080 total=71225121432 gc=1043 goroutines=2
+=== RUN   TestSeedGrowthTwoTimers (seed 5)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=1050 semas=1 empty=1 globalsize=33779384
+DIAG completed=1075 semas=0 empty=0 globalsize=33779384
+DIAG completed=1100 semas=0 empty=0 globalsize=33779384
+DIAG completed=1125 semas=0 empty=0 globalsize=33779384
+DIAG completed=1150 semas=0 empty=0 globalsize=33779384
+DIAG completed=1175 semas=0 empty=0 globalsize=33779384
+DIAG completed=1200 semas=0 empty=0 globalsize=33779384
+DIAG completed=1225 semas=0 empty=0 globalsize=33779384
+DIAG completed=1250 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 6)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=1275 semas=0 empty=0 globalsize=33779384
+DIAG completed=1300 semas=0 empty=0 globalsize=33779384
+DIAG completed=1325 semas=0 empty=0 globalsize=33779384
+DIAG completed=1350 semas=0 empty=0 globalsize=33779384
+DIAG completed=1375 semas=0 empty=0 globalsize=33779384
+DIAG completed=1400 semas=0 empty=0 globalsize=33779384
+DIAG completed=1425 semas=0 empty=0 globalsize=33779384
+DIAG completed=1450 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 7)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=1475 semas=0 empty=0 globalsize=33779384
+DIAG completed=1500 semas=1 empty=1 globalsize=33779384
+DIAG completed=1525 semas=1 empty=1 globalsize=33779384
+DIAG tick=3 runs=1531 heap=69186080 live=70426624 total=104719791520 gc=1532 goroutines=3
+DIAG completed=1550 semas=1 empty=1 globalsize=33779384
+DIAG completed=1575 semas=1 empty=1 globalsize=33779384
+DIAG completed=1600 semas=1 empty=1 globalsize=33779384
+DIAG completed=1625 semas=1 empty=1 globalsize=33779384
+DIAG completed=1650 semas=1 empty=1 globalsize=33779384
+DIAG completed=1675 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 8)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=1700 semas=1 empty=1 globalsize=33779384
+DIAG completed=1725 semas=1 empty=1 globalsize=33779384
+DIAG completed=1750 semas=1 empty=1 globalsize=33779384
+DIAG completed=1775 semas=1 empty=1 globalsize=33779384
+DIAG completed=1800 semas=1 empty=1 globalsize=33779384
+DIAG completed=1825 semas=1 empty=1 globalsize=33779384
+DIAG completed=1850 semas=1 empty=1 globalsize=33779384
+DIAG completed=1875 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 9)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=1900 semas=1 empty=1 globalsize=33779384
+DIAG completed=1925 semas=1 empty=1 globalsize=33779384
+DIAG completed=1950 semas=1 empty=1 globalsize=33779384
+DIAG completed=1975 semas=1 empty=1 globalsize=33779384
+DIAG completed=2000 semas=1 empty=1 globalsize=33779384
+DIAG completed=2025 semas=1 empty=1 globalsize=33779384
+DIAG tick=4 runs=2038 heap=103306320 live=104521728 total=139410953216 gc=2039 goroutines=5
+DIAG completed=2050 semas=1 empty=1 globalsize=33779384
+DIAG completed=2075 semas=1 empty=1 globalsize=33779384
+DIAG completed=2100 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 10)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=2125 semas=1 empty=1 globalsize=33779384
+DIAG completed=2150 semas=0 empty=0 globalsize=33779384
+DIAG completed=2175 semas=0 empty=0 globalsize=33779384
+DIAG completed=2200 semas=0 empty=0 globalsize=33779384
+DIAG completed=2225 semas=0 empty=0 globalsize=33779384
+DIAG completed=2250 semas=0 empty=0 globalsize=33779384
+DIAG completed=2275 semas=0 empty=0 globalsize=33779384
+DIAG completed=2300 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 11)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=2325 semas=0 empty=0 globalsize=33779384
+DIAG completed=2350 semas=0 empty=0 globalsize=33779384
+DIAG completed=2375 semas=0 empty=0 globalsize=33779384
+DIAG completed=2400 semas=0 empty=0 globalsize=33779384
+DIAG completed=2425 semas=0 empty=0 globalsize=33779384
+DIAG completed=2450 semas=0 empty=0 globalsize=33779384
+DIAG completed=2475 semas=0 empty=0 globalsize=33779384
+DIAG completed=2500 semas=0 empty=0 globalsize=33779384
+DIAG completed=2525 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 12)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG tick=5 runs=2549 heap=137284720 live=138158080 total=174341172016 gc=2550 goroutines=4
+DIAG completed=2550 semas=0 empty=0 globalsize=33779384
+DIAG completed=2575 semas=0 empty=0 globalsize=33779384
+DIAG completed=2600 semas=0 empty=0 globalsize=33779384
+DIAG completed=2625 semas=0 empty=0 globalsize=33779384
+DIAG completed=2650 semas=0 empty=0 globalsize=33779384
+DIAG completed=2675 semas=0 empty=0 globalsize=33779384
+DIAG completed=2700 semas=0 empty=0 globalsize=33779384
+DIAG completed=2725 semas=0 empty=0 globalsize=33779384
+DIAG completed=2750 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 13)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=2775 semas=0 empty=0 globalsize=33779384
+DIAG completed=2800 semas=0 empty=0 globalsize=33779384
+DIAG completed=2825 semas=0 empty=0 globalsize=33779384
+DIAG completed=2850 semas=0 empty=0 globalsize=33779384
+DIAG completed=2875 semas=0 empty=0 globalsize=33779384
+DIAG completed=2900 semas=0 empty=0 globalsize=33779384
+DIAG completed=2925 semas=0 empty=0 globalsize=33779384
+DIAG completed=2950 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 14)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=2975 semas=0 empty=0 globalsize=33779384
+DIAG completed=3000 semas=1 empty=1 globalsize=33779384
+DIAG completed=3025 semas=1 empty=1 globalsize=33779384
+DIAG completed=3050 semas=1 empty=1 globalsize=33779384
+DIAG tick=6 runs=3070 heap=137285304 live=138256384 total=209918626424 gc=3070 goroutines=2
+DIAG completed=3075 semas=1 empty=1 globalsize=33779384
+DIAG completed=3100 semas=1 empty=1 globalsize=33779384
+DIAG completed=3125 semas=1 empty=1 globalsize=33779384
+DIAG completed=3150 semas=1 empty=1 globalsize=33779384
+DIAG completed=3175 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 15)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=3200 semas=1 empty=1 globalsize=33779384
+DIAG completed=3225 semas=1 empty=1 globalsize=33779384
+DIAG completed=3250 semas=1 empty=1 globalsize=33779384
+DIAG completed=3275 semas=1 empty=1 globalsize=33779384
+DIAG completed=3300 semas=1 empty=1 globalsize=33779384
+DIAG completed=3325 semas=1 empty=1 globalsize=33779384
+DIAG completed=3350 semas=1 empty=1 globalsize=33779384
+DIAG completed=3375 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 16)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=3400 semas=1 empty=1 globalsize=33779384
+DIAG completed=3425 semas=1 empty=1 globalsize=33779384
+DIAG completed=3450 semas=1 empty=1 globalsize=33779384
+DIAG completed=3475 semas=1 empty=1 globalsize=33779384
+DIAG completed=3500 semas=1 empty=1 globalsize=33779384
+DIAG completed=3525 semas=1 empty=1 globalsize=33779384
+DIAG completed=3550 semas=1 empty=1 globalsize=33779384
+DIAG completed=3575 semas=1 empty=1 globalsize=33779384
+DIAG tick=7 runs=3585 heap=137479152 live=138559488 total=245120443248 gc=3586 goroutines=3
+DIAG completed=3600 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 17)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=3625 semas=0 empty=0 globalsize=33779384
+DIAG completed=3650 semas=0 empty=0 globalsize=33779384
+DIAG completed=3675 semas=0 empty=0 globalsize=33779384
+DIAG completed=3700 semas=0 empty=0 globalsize=33779384
+DIAG completed=3725 semas=0 empty=0 globalsize=33779384
+DIAG completed=3750 semas=0 empty=0 globalsize=33779384
+DIAG completed=3775 semas=0 empty=0 globalsize=33779384
+DIAG completed=3800 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 18)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=3825 semas=0 empty=0 globalsize=33779384
+DIAG completed=3850 semas=1 empty=1 globalsize=33779384
+DIAG completed=3875 semas=1 empty=1 globalsize=33779384
+DIAG completed=3900 semas=1 empty=1 globalsize=33779384
+DIAG completed=3925 semas=1 empty=1 globalsize=33779384
+DIAG completed=3950 semas=1 empty=1 globalsize=33779384
+DIAG completed=3975 semas=1 empty=1 globalsize=33779384
+DIAG completed=4000 semas=1 empty=1 globalsize=33779384
+DIAG completed=4025 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 19)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=4050 semas=1 empty=1 globalsize=33779384
+DIAG completed=4075 semas=1 empty=1 globalsize=33779384
+DIAG tick=8 runs=4092 heap=103112424 live=104800256 total=279808991296 gc=4092 goroutines=4
+DIAG completed=4100 semas=1 empty=1 globalsize=33779384
+DIAG completed=4125 semas=1 empty=1 globalsize=33779384
+DIAG completed=4150 semas=1 empty=1 globalsize=33779384
+DIAG completed=4175 semas=1 empty=1 globalsize=33779384
+DIAG completed=4200 semas=1 empty=1 globalsize=33779384
+DIAG completed=4225 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 20)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=4250 semas=1 empty=1 globalsize=33779384
+DIAG completed=4275 semas=1 empty=1 globalsize=33779384
+DIAG completed=4300 semas=1 empty=1 globalsize=33779384
+DIAG completed=4325 semas=1 empty=1 globalsize=33779384
+DIAG completed=4350 semas=1 empty=1 globalsize=33779384
+DIAG completed=4375 semas=1 empty=1 globalsize=33779384
+DIAG completed=4400 semas=1 empty=1 globalsize=33779384
+DIAG completed=4425 semas=1 empty=1 globalsize=33779384
+DIAG completed=4450 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 21)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=4475 semas=0 empty=0 globalsize=33779384
+DIAG completed=4500 semas=0 empty=0 globalsize=33779384
+DIAG completed=4525 semas=0 empty=0 globalsize=33779384
+DIAG completed=4550 semas=0 empty=0 globalsize=33779384
+DIAG completed=4575 semas=0 empty=0 globalsize=33779384
+DIAG completed=4600 semas=0 empty=0 globalsize=33779384
+DIAG tick=9 runs=4623 heap=137366904 live=138289152 total=316070029616 gc=4622 goroutines=3
+DIAG completed=4625 semas=0 empty=0 globalsize=33779384
+DIAG completed=4650 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 22)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=4675 semas=0 empty=0 globalsize=33779384
+DIAG completed=4700 semas=0 empty=0 globalsize=33779384
+DIAG completed=4725 semas=0 empty=0 globalsize=33779384
+DIAG completed=4750 semas=0 empty=0 globalsize=33779384
+DIAG completed=4775 semas=0 empty=0 globalsize=33779384
+DIAG completed=4800 semas=0 empty=0 globalsize=33779384
+DIAG completed=4825 semas=0 empty=0 globalsize=33779384
+DIAG completed=4850 semas=0 empty=0 globalsize=33779384
+DIAG completed=4875 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 23)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=4900 semas=0 empty=0 globalsize=33779384
+DIAG completed=4925 semas=0 empty=0 globalsize=33779384
+DIAG completed=4950 semas=0 empty=0 globalsize=33779384
+DIAG completed=4975 semas=0 empty=0 globalsize=33779384
+DIAG completed=5000 semas=0 empty=0 globalsize=33779384
+DIAG completed=5025 semas=0 empty=0 globalsize=33779384
+DIAG completed=5050 semas=0 empty=0 globalsize=33779384
+DIAG completed=5075 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 24)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=5100 semas=0 empty=0 globalsize=33779384
+DIAG completed=5125 semas=1 empty=1 globalsize=33779384
+DIAG tick=10 runs=5127 heap=103123368 live=104407040 total=350553770048 gc=5127 goroutines=4
+DIAG completed=5150 semas=1 empty=1 globalsize=33779384
+DIAG completed=5175 semas=1 empty=1 globalsize=33779384
+DIAG completed=5200 semas=1 empty=1 globalsize=33779384
+DIAG completed=5225 semas=1 empty=1 globalsize=33779384
+DIAG completed=5250 semas=1 empty=1 globalsize=33779384
+DIAG completed=5275 semas=1 empty=1 globalsize=33779384
+DIAG completed=5300 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 25)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=5325 semas=1 empty=1 globalsize=33779384
+DIAG completed=5350 semas=1 empty=1 globalsize=33779384
+DIAG completed=5375 semas=1 empty=1 globalsize=33779384
+DIAG completed=5400 semas=1 empty=1 globalsize=33779384
+DIAG completed=5425 semas=1 empty=1 globalsize=33779384
+DIAG completed=5450 semas=1 empty=1 globalsize=33779384
+DIAG completed=5475 semas=1 empty=1 globalsize=33779384
+DIAG completed=5500 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 26)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=5525 semas=1 empty=1 globalsize=33779384
+DIAG tick=11 runs=5539 heap=68974232 live=70336512 total=378683665256 gc=5538 goroutines=2
+DIAG completed=5550 semas=1 empty=1 globalsize=33779384
+DIAG completed=5575 semas=1 empty=1 globalsize=33779384
+DIAG completed=5600 semas=1 empty=1 globalsize=33779384
+DIAG completed=5625 semas=1 empty=1 globalsize=33779384
+DIAG completed=5650 semas=1 empty=1 globalsize=33779384
+DIAG completed=5675 semas=1 empty=1 globalsize=33779384
+DIAG completed=5700 semas=1 empty=1 globalsize=33779384
+DIAG completed=5725 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 27)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=5750 semas=1 empty=1 globalsize=33779384
+DIAG completed=5775 semas=0 empty=0 globalsize=33779384
+DIAG completed=5800 semas=0 empty=0 globalsize=33779384
+DIAG completed=5825 semas=0 empty=0 globalsize=33779384
+DIAG completed=5850 semas=0 empty=0 globalsize=33779384
+DIAG completed=5875 semas=0 empty=0 globalsize=33779384
+DIAG tick=12 runs=5882 heap=103415192 live=104480768 total=402128796120 gc=5876 goroutines=3
+DIAG completed=5900 semas=0 empty=0 globalsize=33779384
+DIAG completed=5925 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 28)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=5950 semas=0 empty=0 globalsize=33779384
+DIAG completed=5975 semas=1 empty=1 globalsize=33779384
+DIAG completed=6000 semas=1 empty=1 globalsize=33779384
+DIAG completed=6025 semas=1 empty=1 globalsize=33779384
+DIAG completed=6050 semas=1 empty=1 globalsize=33779384
+DIAG completed=6075 semas=1 empty=1 globalsize=33779384
+DIAG completed=6100 semas=1 empty=1 globalsize=33779384
+DIAG completed=6125 semas=1 empty=1 globalsize=33779384
+DIAG completed=6150 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 29)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=6175 semas=1 empty=1 globalsize=33779384
+DIAG completed=6200 semas=0 empty=0 globalsize=33779384
+DIAG completed=6225 semas=0 empty=0 globalsize=33779384
+DIAG completed=6250 semas=0 empty=0 globalsize=33779384
+DIAG tick=13 runs=6262 heap=103177104 live=104251392 total=428102481328 gc=6253 goroutines=2
+DIAG completed=6275 semas=0 empty=0 globalsize=33779384
+DIAG completed=6300 semas=0 empty=0 globalsize=33779384
+DIAG completed=6325 semas=0 empty=0 globalsize=33779384
+DIAG completed=6350 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 30)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=6375 semas=0 empty=0 globalsize=33779384
+DIAG completed=6400 semas=0 empty=0 globalsize=33779384
+DIAG completed=6425 semas=0 empty=0 globalsize=33779384
+DIAG completed=6450 semas=0 empty=0 globalsize=33779384
+DIAG completed=6475 semas=0 empty=0 globalsize=33779384
+DIAG completed=6500 semas=0 empty=0 globalsize=33779384
+DIAG completed=6525 semas=0 empty=0 globalsize=33779384
+DIAG completed=6550 semas=0 empty=0 globalsize=33779384
+DIAG completed=6575 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 31)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=6600 semas=0 empty=0 globalsize=33779384
+DIAG completed=6625 semas=0 empty=0 globalsize=33779384
+DIAG completed=6650 semas=0 empty=0 globalsize=33779384
+DIAG completed=6675 semas=0 empty=0 globalsize=33779384
+DIAG completed=6700 semas=0 empty=0 globalsize=33779384
+DIAG tick=14 runs=6714 heap=69347104 live=70451200 total=459032288248 gc=6705 goroutines=5
+DIAG completed=6725 semas=0 empty=0 globalsize=33779384
+DIAG completed=6750 semas=0 empty=0 globalsize=33779384
+DIAG completed=6775 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 32)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=6800 semas=0 empty=0 globalsize=33779384
+DIAG completed=6825 semas=1 empty=1 globalsize=33779384
+DIAG completed=6850 semas=1 empty=1 globalsize=33779384
+DIAG completed=6875 semas=1 empty=1 globalsize=33779384
+DIAG completed=6900 semas=1 empty=1 globalsize=33779384
+DIAG completed=6925 semas=1 empty=1 globalsize=33779384
+DIAG completed=6950 semas=1 empty=1 globalsize=33779384
+DIAG completed=6975 semas=1 empty=1 globalsize=33779384
+DIAG completed=7000 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 33)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=7025 semas=1 empty=1 globalsize=33779384
+DIAG completed=7050 semas=0 empty=0 globalsize=33779384
+DIAG completed=7075 semas=0 empty=0 globalsize=33779384
+DIAG completed=7100 semas=0 empty=0 globalsize=33779384
+DIAG completed=7125 semas=0 empty=0 globalsize=33779384
+DIAG completed=7150 semas=0 empty=0 globalsize=33779384
+DIAG tick=15 runs=7158 heap=103178128 live=104357888 total=489346246304 gc=7148 goroutines=2
+DIAG completed=7175 semas=0 empty=0 globalsize=33779384
+DIAG completed=7200 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 34)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=7225 semas=0 empty=0 globalsize=33779384
+DIAG completed=7250 semas=0 empty=0 globalsize=33779384
+DIAG completed=7275 semas=0 empty=0 globalsize=33779384
+DIAG completed=7300 semas=0 empty=0 globalsize=33779384
+DIAG completed=7325 semas=0 empty=0 globalsize=33779384
+DIAG completed=7350 semas=0 empty=0 globalsize=33779384
+DIAG completed=7375 semas=0 empty=0 globalsize=33779384
+DIAG completed=7400 semas=0 empty=0 globalsize=33779384
+DIAG completed=7425 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 35)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=7450 semas=0 empty=0 globalsize=33779384
+DIAG completed=7475 semas=0 empty=0 globalsize=33779384
+DIAG completed=7500 semas=0 empty=0 globalsize=33779384
+DIAG completed=7525 semas=0 empty=0 globalsize=33779384
+DIAG completed=7550 semas=0 empty=0 globalsize=33779384
+DIAG completed=7575 semas=0 empty=0 globalsize=33779384
+DIAG completed=7600 semas=0 empty=0 globalsize=33779384
+DIAG completed=7625 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 36)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=7650 semas=0 empty=0 globalsize=33779384
+DIAG tick=16 runs=7652 heap=137349136 live=138485760 total=523146497584 gc=7642 goroutines=4
+DIAG completed=7675 semas=0 empty=0 globalsize=33779384
+DIAG completed=7700 semas=0 empty=0 globalsize=33779384
+DIAG completed=7725 semas=0 empty=0 globalsize=33779384
+DIAG completed=7750 semas=0 empty=0 globalsize=33779384
+DIAG completed=7775 semas=0 empty=0 globalsize=33779384
+DIAG completed=7800 semas=0 empty=0 globalsize=33779384
+DIAG completed=7825 semas=0 empty=0 globalsize=33779384
+DIAG completed=7850 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 37)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=7875 semas=0 empty=0 globalsize=33779384
+DIAG completed=7900 semas=1 empty=1 globalsize=33779384
+DIAG completed=7925 semas=1 empty=1 globalsize=33779384
+DIAG completed=7950 semas=1 empty=1 globalsize=33779384
+DIAG completed=7975 semas=1 empty=1 globalsize=33779384
+DIAG completed=8000 semas=1 empty=1 globalsize=33779384
+DIAG completed=8025 semas=1 empty=1 globalsize=33779384
+DIAG completed=8050 semas=1 empty=1 globalsize=33779384
+DIAG completed=8075 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 38)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=8100 semas=0 empty=0 globalsize=33779384
+DIAG completed=8125 semas=0 empty=0 globalsize=33779384
+DIAG completed=8150 semas=0 empty=0 globalsize=33779384
+DIAG tick=17 runs=8153 heap=69004328 live=70393856 total=557356917168 gc=8143 goroutines=3
+DIAG completed=8175 semas=0 empty=0 globalsize=33779384
+DIAG completed=8200 semas=0 empty=0 globalsize=33779384
+DIAG completed=8225 semas=0 empty=0 globalsize=33779384
+DIAG completed=8250 semas=0 empty=0 globalsize=33779384
+DIAG completed=8275 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 39)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:19[0m[36m >[0m b [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=8300 semas=0 empty=0 globalsize=33779384
+DIAG completed=8325 semas=1 empty=1 globalsize=33779384
+DIAG completed=8350 semas=1 empty=1 globalsize=33779384
+DIAG completed=8375 semas=1 empty=1 globalsize=33779384
+DIAG completed=8400 semas=1 empty=1 globalsize=33779384
+DIAG completed=8425 semas=1 empty=1 globalsize=33779384
+DIAG completed=8450 semas=1 empty=1 globalsize=33779384
+DIAG completed=8475 semas=1 empty=1 globalsize=33779384
+DIAG completed=8500 semas=1 empty=1 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 40)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+ok  	translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior	17.809s
+	Command being timed: ".gosim/gosimtool test -v -run ^TestSeedGrowthTwoTimers$ -seeds 1-40 ./internal/tests/behavior"
+	User time (seconds): 107.04
+	System time (seconds): 11.14
+	Percent of CPU this job got: 260%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:45.31
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 753748
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 979
+	Minor (reclaiming a frame) page faults: 3113348
+	Voluntary context switches: 339681
+	Involuntary context switches: 119421
+	Swaps: 0
+	File system inputs: 203136
+	File system outputs: 2313032
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

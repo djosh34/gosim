@@ -1,0 +1,83 @@
+=== RUN   TestSeedGrowthTwoTimers (seed 1)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+SIGQUIT: quit
+PC=0xa233c m=0 sigcode=0
+
+goroutine 0 gp=0x1901720 m=0 mp=0x1902160 [idle]:
+runtime.futex(0x19022b8, 0x80, 0x0, 0x0, 0x0, 0x0)
+	runtime/sys_linux_arm64.s:665 +0x1c fp=0xffffca88c7e0 sp=0xffffca88c7e0 pc=0xa233c
+runtime.futexsleep(0xffffca88c858?, 0x69040?, 0xffffca88c868?)
+	runtime/os_linux.go:73 +0x28 fp=0xffffca88c830 sp=0xffffca88c7e0 pc=0x5be38
+runtime.notesleep(0x19022b8)
+	runtime/lock_futex.go:47 +0x8c fp=0xffffca88c870 sp=0xffffca88c830 pc=0x2eaac
+runtime.mPark(...)
+	runtime/proc.go:1985
+runtime.stopm()
+	runtime/proc.go:3023 +0x84 fp=0xffffca88c8a0 sp=0xffffca88c870 pc=0x66734
+runtime.findRunnable()
+	runtime/proc.go:3811 +0xf84 fp=0xffffca88ca70 sp=0xffffca88c8a0 pc=0x68424
+runtime.schedule()
+	runtime/proc.go:4179 +0x90 fp=0xffffca88cab0 sp=0xffffca88ca70 pc=0x69720
+runtime.park_m(0x4ec384104d20)
+	runtime/proc.go:4319 +0x23c fp=0xffffca88cb10 sp=0xffffca88cab0 pc=0x69b9c
+runtime.mcall()
+	runtime/asm_arm64.s:319 +0x54 fp=0xffffca88cb20 sp=0xffffca88cb10 pc=0x9f314
+
+goroutine 1 gp=0x4ec38405c1e0 m=nil [coroutine]:
+runtime.coroswitch(0x4ec384165768?)
+	runtime/coro.go:94 +0x48 fp=0x4ec384165730 sp=0x4ec384165710 pc=0x97518
+github.com/jellevandenhooff/gosim/internal/coro.(*Coro).Next(...)
+	github.com/jellevandenhooff/gosim@v0.0.0/internal/coro/coro_linkname.go:52
+github.com/jellevandenhooff/gosim/internal/coro.(*Upcallcoro).Next(...)
+	github.com/jellevandenhooff/gosim@v0.0.0/internal/coro/upcallcoro_norace.go:15
+github.com/jellevandenhooff/gosim/gosimruntime.(*goroutine).step(0x4ec38c5088f0)
+	github.com/jellevandenhooff/gosim@v0.0.0/gosimruntime/runtime.go:697 +0x74 fp=0x4ec3841657e0 sp=0x4ec384165730 pc=0x229fc4
+github.com/jellevandenhooff/gosim/gosimruntime.(*scheduler).Run(0x4ec385de4ee0)
+	github.com/jellevandenhooff/gosim@v0.0.0/gosimruntime/runtime.go:291 +0x138 fp=0x4ec384165860 sp=0x4ec3841657e0 pc=0x228378
+github.com/jellevandenhooff/gosim/gosimruntime.run(0x4ec385a3a000, 0x2, 0xfb?, 0x1, {0x9906fc?, 0x0?}, {0x18a8600, 0x4ec3859b2f90}, {0x1928be0, 0x0, ...})
+	github.com/jellevandenhooff/gosim@v0.0.0/gosimruntime/runtime.go:413 +0xadc fp=0x4ec384165b30 sp=0x4ec384165860 pc=0x2290dc
+github.com/jellevandenhooff/gosim/gosimruntime.TestMain({0x18b09b0, 0x1928be0})
+	github.com/jellevandenhooff/gosim@v0.0.0/gosimruntime/testmain.go:179 +0x568 fp=0x4ec384165e10 sp=0x4ec384165b30 pc=0x22d508
+translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior_test.TestMain(...)
+	translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior/gosim_meta_test.go:230
+main.main()
+	_testmain.go:48 +0x9c fp=0x4ec384165ea0 sp=0x4ec384165e10 pc=0x97fb9c
+runtime.main()
+	runtime/proc.go:302 +0x380 fp=0x4ec384165fd0 sp=0x4ec384165ea0 pc=0x61b20
+runtime.goexit({})
+	runtime/asm_arm64.s:1039 +0x4 fp=0x4ec384165fd0 sp=0x4ec384165fd0 pc=0xa12b4
+
+goroutine 17 gp=0x4ec3841043c0 m=nil [force gc (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	runtime/proc.go:474 +0xb8 fp=0x4ec3840cc790 sp=0x4ec3840cc770 pc=0x9a528
+runtime.goparkunlock(...)
+	runtime/proc.go:480
+runtime.forcegchelper()
+	runtime/proc.go:387 +0xb4 fp=0x4ec3840cc7d0 sp=0x4ec3840cc790 pc=0x61e04
+runtime.goexit({})
+	runtime/asm_arm64.s:1039 +0x4 fp=0x4ec3840cc7d0 sp=0x4ec3840cc7d0 pc=0xa12b4
+created by runtime.init.7 in goroutine 1
+	runtime/proc.go:375 +0x24
+
+goroutine 18 gp=0x4ec3841045a0 m=nil [GC sweep wait]:
+runtime.gopark(0x1900901?, 0x0?, 0x0?, 0x0?, 0x0?)
+	runtime/proc.go:474 +0xb8 fp=0x4ec3840ccf70 sp=0x4ec3840ccf50 pc=0x9a528
+runtime.goparkunlock(...)
+	runtime/proc.go:480
+runtime.bgsweep(0x4ec38411a000)
+	runtime/mgcsweep.go:324 +0x178 fp=0x4ec3840ccfb0 sp=0x4ec3840ccf70 pc=0x4b4a8
+runtime.gcenable.gowrap1()
+	runtime/mgc.go:214 +0x20 fp=0x4ec3840ccfd0 sp=0x4ec3840ccfb0 pc=0x8fed0
+runtime.goexit({})
+	runtime/asm_arm64.s:1039 +0x4 fp=0x4ec3840ccfd0 sp=0x4ec3840ccfd0 pc=0xa12b4
+created by runtime.gcenable in goroutine 1
+	runtime/mgc.go:214 +0x6c
+
+goroutine 19 gp=0x4ec384104780 m=nil [GC scavenge wait]:
+runtime.gopark(0xc65b6a?, 0x3b9aca00?, 0x0?, 0x0?, 0x0?)
+	runtime/proc.go:474 +0xb8 fp=0x4ec38418b760 sp=0x4ec38418b740 pc=0x9a528
+runtime.goparkunlock(...)
+	runtime/proc.go:480
+runtime.(*scavengerState).park(0x19010e0)
+	runtime/mgcscavenge.go:425 +0x5c fp=0x4ec38418b790 sp=0x4ec38418b760 pc=0x4903c

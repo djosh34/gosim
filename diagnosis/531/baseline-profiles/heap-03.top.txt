@@ -1,0 +1,21 @@
+File: before.test
+Build ID: 140b695d76b1a6af2986a78a114a78719dbf6bbd
+Type: inuse_space
+Time: 2026-11-07 23:18:24 CET
+Showing nodes accounting for 1.42GB, 98.70% of 1.43GB total
+Dropped 104 nodes (cum <= 0.01GB)
+      flat  flat%   sum%        cum   cum%
+    1.42GB 98.70% 98.70%     1.42GB 98.70%  reflect.unsafe_New
+         0     0% 98.70%     0.01GB  0.99%  github.com/jellevandenhooff/gosim/gosimruntime.InitGlobals
+         0     0% 98.70%     1.42GB 98.70%  github.com/jellevandenhooff/gosim/gosimruntime.TestMain
+         0     0% 98.70%     1.42GB 98.70%  github.com/jellevandenhooff/gosim/gosimruntime.allocGlobals
+         0     0% 98.70%     0.02GB  1.06%  github.com/jellevandenhooff/gosim/gosimruntime.goroutineEntrypoint
+         0     0% 98.70%     1.42GB 98.70%  github.com/jellevandenhooff/gosim/gosimruntime.newMachine (inline)
+         0     0% 98.70%     1.42GB 98.70%  github.com/jellevandenhooff/gosim/gosimruntime.run
+         0     0% 98.70%     0.01GB  0.99%  github.com/jellevandenhooff/gosim/gosimruntime.run.func1
+         0     0% 98.70%     0.02GB  1.06%  github.com/jellevandenhooff/gosim/internal/coro.(*Coro).Start.func1
+         0     0% 98.70%     1.42GB 98.70%  main.main
+         0     0% 98.70%     1.42GB 98.70%  reflect.New
+         0     0% 98.70%     0.02GB  1.06%  runtime.corostart
+         0     0% 98.70%     1.42GB 98.70%  runtime.main
+         0     0% 98.70%     1.42GB 98.70%  translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior_test.TestMain (inline)

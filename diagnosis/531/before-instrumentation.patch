@@ -1,0 +1,44 @@
+diff --git a/gosimruntime/runtime.go b/gosimruntime/runtime.go
+index 78b6b71..080363f 100644
+--- a/gosimruntime/runtime.go
++++ b/gosimruntime/runtime.go
+@@ -98,6 +98,11 @@ func newMachine(label string) *Machine {
+ type scheduler struct {
+ 	seed int64
+ 
++	// A semaphore's address can point into a machine's globals. Keep the
++	// table within the run: abort removes waiters but an empty entry can
++	// remain until its hash bucket is visited again.
++	semas [semasSize]*sema
++
+ 	goroutines      intrusiveList[*goroutine]
+ 	runnable        intrusiveList[*goroutine]
+ 	nextGoroutineID int
+@@ -356,6 +361,7 @@ func Seed() int64 {
+ }
+ 
+ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOverride string, simLogger io.Writer, extraenv []string) internalRunResult {
++	diagRuns.Add(1)
+ 	if !runtimeInitialized {
+ 		panic("not yet initialized")
+ 	}
+@@ -411,6 +417,7 @@ func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOve
+ 		checksummer.recordIntInt(checksumKeyRunStarted, 0, 0)
+ 	}
+ 	runErr := scheduler.Run()
++	diagComplete()
+ 	if runErr == ErrMainReturned {
+ 		runErr = nil
+ 	}
+diff --git a/gosimruntime/sema.go b/gosimruntime/sema.go
+index efc548e..2b92e9f 100644
+--- a/gosimruntime/sema.go
++++ b/gosimruntime/sema.go
+@@ -70,6 +70,7 @@ func getsema(addr *uint32, alloc bool) *sema {
+ 	} else {
+ 		cur = &sema{}
+ 	}
++	diagSemaphore()
+ 	cur.ptr = addr
+ 	cur.next = semas[idx]
+ 	semas[idx] = cur

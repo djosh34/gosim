@@ -1,0 +1,45 @@
+diff --git a/gosimruntime/runtime.go b/gosimruntime/runtime.go
+index 72da41a..78b6b71 100644
+--- a/gosimruntime/runtime.go
++++ b/gosimruntime/runtime.go
+@@ -98,11 +98,6 @@ func newMachine(label string) *Machine {
+ type scheduler struct {
+ 	seed int64
+ 
+-	// A semaphore's address can point into a machine's globals. Keep the
+-	// table within the run: abort removes waiters but an empty entry can
+-	// remain until its hash bucket is visited again.
+-	semas [semasSize]*sema
+-
+ 	goroutines      intrusiveList[*goroutine]
+ 	runnable        intrusiveList[*goroutine]
+ 	nextGoroutineID int
+diff --git a/gosimruntime/sema.go b/gosimruntime/sema.go
+index 696eacf..efc548e 100644
+--- a/gosimruntime/sema.go
++++ b/gosimruntime/sema.go
+@@ -20,6 +20,8 @@ type sema struct {
+ 
+ const semasSize = 251 // prime just like in runtime
+ 
++var semas [semasSize]*sema
++
+ // TODO: store these structs on g instead or something?
+ var semaPool []*sema
+ 
+@@ -46,7 +48,6 @@ func maybefree(semaPtr **sema) {
+ 
+ //go:norace
+ func getsema(addr *uint32, alloc bool) *sema {
+-	semas := &gs.get().semas
+ 	idx := (uintptr(unsafe.Pointer(addr)) >> 3) % semasSize
+ 
+ 	maybefree(&semas[idx])
+@@ -78,7 +79,6 @@ func getsema(addr *uint32, alloc bool) *sema {
+ 
+ //go:norace
+ func freesema(addr *uint32) {
+-	semas := &gs.get().semas
+ 	idx := (uintptr(unsafe.Pointer(addr)) >> 3) % semasSize
+ 
+ 	if semas[idx].ptr == addr {

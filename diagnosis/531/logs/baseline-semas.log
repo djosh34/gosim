@@ -1,0 +1,18 @@
+Running scope as unit: run-rf511b60e4377417b9df080b2e0988689.scope
+DIAG completed=25 semas=0 empty=0 globalsize=33779384
+DIAG completed=50 semas=0 empty=0 globalsize=33779384
+DIAG completed=75 semas=0 empty=0 globalsize=33779384
+DIAG completed=100 semas=0 empty=0 globalsize=33779384
+DIAG completed=125 semas=0 empty=0 globalsize=33779384
+DIAG completed=150 semas=0 empty=0 globalsize=33779384
+DIAG completed=175 semas=0 empty=0 globalsize=33779384
+=== RUN   TestSeedGrowthTwoTimers (seed 1)
+    1 main/4     [90m14:10:04.000[0m [32mINF[0m [90mbehavior/seed_growth_test.go:17[0m[36m >[0m a [36mmethod=[0mt.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+DIAG completed=200 semas=0 empty=0 globalsize=33779384
+DIAG completed=225 semas=12 empty=12 globalsize=33779384
+DIAG completed=250 semas=35 empty=35 globalsize=33779384
+DIAG tick=1 runs=265 heap=1979642376 live=1981898752 total=18215478768 gc=226 goroutines=5
+DIAG after forced GC heap=1637605080 gc=227
+FAIL	translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior	1.056s
+FAIL

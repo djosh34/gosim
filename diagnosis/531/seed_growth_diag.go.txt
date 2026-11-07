@@ -1,0 +1,69 @@
+package gosimruntime
+
+// Temporary native instrumentation for tigerstore #531. No simulated calls.
+import (
+ "fmt"
+ "os"
+ "path/filepath"
+ "runtime"
+ "runtime/pprof"
+ "sync/atomic"
+ "time"
+ "strings"
+)
+
+var diagRuns atomic.Uint64
+
+func init() {
+ dir := os.Getenv("GOSIM_SEED_DIAG")
+ if dir == "" { return }
+ os.MkdirAll(dir, 0755)
+ go func() {
+  started := time.Now()
+  var last uint64
+  for tick := 1; ; tick++ {
+   time.Sleep(time.Second)
+   var m runtime.MemStats
+   runtime.ReadMemStats(&m)
+   runs := diagRuns.Load()
+   status, _ := os.ReadFile("/proc/self/status")
+   for _, line := range strings.Split(string(status), "\n") { if strings.HasPrefix(line, "VmRSS:") { fmt.Fprintln(os.Stderr, "DIAG", line) } }
+   fmt.Fprintf(os.Stderr, "DIAG tick=%d runs=%d heap=%d live=%d total=%d gc=%d goroutines=%d\n", tick, runs, m.HeapAlloc, m.HeapInuse, m.TotalAlloc, m.NumGC, runtime.NumGoroutine())
+   if tick <= 4 || tick%10 == 0 || tick >= 20 {
+    stackFile, _ := os.Create(filepath.Join(dir, fmt.Sprintf("stacks-%02d.txt", tick))); pprof.Lookup("goroutine").WriteTo(stackFile, 2); stackFile.Close()
+    f, _ := os.Create(filepath.Join(dir, fmt.Sprintf("heap-%02d.pprof", tick)))
+    pprof.WriteHeapProfile(f); f.Close()
+   }
+   if (runs == last && time.Since(started) > 15*time.Second) || tick >= 20 {
+    f, _ := os.Create(filepath.Join(dir, fmt.Sprintf("goroutines-%02d.txt", tick)))
+    pprof.Lookup("goroutine").WriteTo(f, 2); f.Close()
+    if tick >= 20 || time.Since(started) > 25*time.Second {
+     runtime.GC()
+     runtime.ReadMemStats(&m)
+     fmt.Fprintf(os.Stderr, "DIAG after forced GC heap=%d gc=%d\n", m.HeapAlloc, m.NumGC)
+     f, _ := os.Create(filepath.Join(dir, "heap-forced.pprof")); pprof.WriteHeapProfile(f); f.Close()
+     os.Exit(86)
+    }
+   }
+   last = runs
+  }
+ }()
+}
+
+func diagComplete() {
+ if os.Getenv("GOSIM_SEED_DIAG") == "" || diagRuns.Load()%25 != 0 { return }
+ n, empty := 0, 0
+ for _, s := range semas { for ; s != nil; s = s.next { n++; if s.q.first == nil { empty++ } } }
+ fmt.Fprintf(os.Stderr, "DIAG completed=%d semas=%d empty=%d globalsize=%d\n", diagRuns.Load(), n, empty, mergedGlobalTyp.Size())
+}
+
+var diagSemaCalls int
+func diagSemaphore() {
+ if os.Getenv("GOSIM_SEED_DIAG") == "" { return }
+ diagSemaCalls++
+ if diagSemaCalls <= 2 || diagRuns.Load() == 225 {
+  buf := make([]byte, 16384)
+  n := runtime.Stack(buf, false)
+  fmt.Fprintf(os.Stderr, "DIAG semaphore allocated run=%d\n%s", diagRuns.Load(), buf[:n])
+ }
+}

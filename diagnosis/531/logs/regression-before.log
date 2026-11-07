@@ -1,0 +1,6 @@
+Running scope as unit: run-r6e78e9f20bc24e5ea3bd2172d9814c24.scope
+--- FAIL: TestSemaphoreDoesNotRetainRun (0.00s)
+    sema_test.go:26: an empty semaphore retained the previous run's allocation
+FAIL
+FAIL	github.com/jellevandenhooff/gosim/gosimruntime	0.005s
+FAIL

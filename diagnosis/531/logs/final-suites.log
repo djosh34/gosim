@@ -1,0 +1,52 @@
+Running scope as unit: run-rea39a78be5e84f5da29e62c76c29cb15.scope
+COMMIT 88c9b48de93461f8eff809ceb3115013d625fbaf
+?   	github.com/jellevandenhooff/gosim	[no test files]
+ok  	github.com/jellevandenhooff/gosim/gosimruntime	0.237s
+?   	github.com/jellevandenhooff/gosim/internal/coro	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/gosimlog	0.004s
+?   	github.com/jellevandenhooff/gosim/internal/gosimtool	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/hooks/go127	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/prettylog	0.004s
+?   	github.com/jellevandenhooff/gosim/internal/race	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/reflect	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/simulation	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/simulation/fs	0.005s
+?   	github.com/jellevandenhooff/gosim/internal/simulation/network	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/simulation/syscallabi	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/testing	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/tests/behavior	18.802s
+ok  	github.com/jellevandenhooff/gosim/internal/tests/race	0.002s
+ok  	github.com/jellevandenhooff/gosim/internal/tests/script	15.950s
+?   	github.com/jellevandenhooff/gosim/internal/tests/testpb	[no test files]
+ok  	github.com/jellevandenhooff/gosim/metatesting	1.964s
+ok  	github.com/jellevandenhooff/gosim/nemesis	0.476s
+ok  	github.com/jellevandenhooff/gosim/cmd/gosim	0.006s
+?   	github.com/jellevandenhooff/gosim/cmd/gosim/internal/gensyscall	[no test files]
+?   	github.com/jellevandenhooff/gosim/cmd/gosim/internal/gosimviewer	[no test files]
+ok  	github.com/jellevandenhooff/gosim/cmd/gosim/internal/translate	2.091s
+ok  	github.com/jellevandenhooff/gosim/cmd/gosim/internal/translate/cache	0.023s
+?   	github.com/jellevandenhooff/gosim	[no test files]
+ok  	github.com/jellevandenhooff/gosim/gosimruntime	1.289s
+?   	github.com/jellevandenhooff/gosim/internal/coro	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/gosimlog	1.014s
+?   	github.com/jellevandenhooff/gosim/internal/gosimtool	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/hooks/go127	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/prettylog	1.017s
+?   	github.com/jellevandenhooff/gosim/internal/race	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/reflect	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/simulation	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/simulation/fs	1.026s
+?   	github.com/jellevandenhooff/gosim/internal/simulation/network	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/simulation/syscallabi	[no test files]
+?   	github.com/jellevandenhooff/gosim/internal/testing	[no test files]
+ok  	github.com/jellevandenhooff/gosim/internal/tests/behavior	39.527s
+ok  	github.com/jellevandenhooff/gosim/internal/tests/race	3.445s
+ok  	github.com/jellevandenhooff/gosim/internal/tests/script	16.706s
+?   	github.com/jellevandenhooff/gosim/internal/tests/testpb	[no test files]
+ok  	github.com/jellevandenhooff/gosim/metatesting	3.995s
+ok  	github.com/jellevandenhooff/gosim/nemesis	2.474s
+ok  	github.com/jellevandenhooff/gosim/cmd/gosim	1.024s
+?   	github.com/jellevandenhooff/gosim/cmd/gosim/internal/gensyscall	[no test files]
+?   	github.com/jellevandenhooff/gosim/cmd/gosim/internal/gosimviewer	[no test files]
+ok  	github.com/jellevandenhooff/gosim/cmd/gosim/internal/translate	4.444s
+ok  	github.com/jellevandenhooff/gosim/cmd/gosim/internal/translate/cache	1.034s

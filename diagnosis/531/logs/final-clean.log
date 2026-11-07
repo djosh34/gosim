@@ -1,0 +1,143 @@
+=== RUN   TestSeedGrowthTwoTimers (seed 1)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 2)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 3)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 4)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 5)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 6)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 7)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 8)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 9)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 10)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 11)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 12)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 13)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 14)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 15)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 16)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 17)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 18)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 19)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 20)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 21)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 22)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 23)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 24)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 25)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 26)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 27)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 28)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 29)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 30)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 31)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 32)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 33)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 34)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 35)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 36)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 37)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 38)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 39)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:19 > b method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+=== RUN   TestSeedGrowthTwoTimers (seed 40)
+    1 main/4     14:10:04.000 INF behavior/seed_growth_test.go:17 > a method=t.Log
+--- PASS: TestSeedGrowthTwoTimers (1.00s simulated)
+	Command being timed: "/tmp/gosim-531-evidence/final.test -test.run ^TestSeedGrowthTwoTimers$ -seeds 1-40"
+	User time (seconds): 27.50
+	System time (seconds): 2.57
+	Percent of CPU this job got: 150%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:19.97
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 227388
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 293
+	Minor (reclaiming a frame) page faults: 79367
+	Voluntary context switches: 188194
+	Involuntary context switches: 12693
+	Swaps: 0
+	File system inputs: 45936
+	File system outputs: 40
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

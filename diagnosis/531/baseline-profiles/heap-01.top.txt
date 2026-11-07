@@ -1,0 +1,51 @@
+File: before.test
+Build ID: 140b695d76b1a6af2986a78a114a78719dbf6bbd
+Type: inuse_space
+Time: 2026-11-07 23:18:22 CET
+Showing nodes accounting for 68.94MB, 100% of 68.94MB total
+      flat  flat%   sum%        cum   cum%
+   64.44MB 93.46% 93.46%    64.44MB 93.46%  reflect.unsafe_New
+    3.01MB  4.36% 97.82%     3.51MB  5.09%  runtime.mallocgc
+    0.50MB  0.73% 98.55%     0.50MB  0.73%  translated/html/template.initializers
+    0.50MB  0.73% 99.27%     0.50MB  0.73%  translated/unicode.initializers
+    0.50MB  0.73%   100%     0.50MB  0.73%  runtime.mallocgcSmallScanNoHeaderSC2
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/gosimruntime.(*goroutine).upcall (inline)
+         0     0%   100%        1MB  1.45%  github.com/jellevandenhooff/gosim/gosimruntime.InitGlobals
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/gosimruntime.NewMachine
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/gosimruntime.NewMachine.func1 (inline)
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/gosimruntime.TestMain
+         0     0%   100%    64.44MB 93.46%  github.com/jellevandenhooff/gosim/gosimruntime.allocGlobals
+         0     0%   100%    33.22MB 48.18%  github.com/jellevandenhooff/gosim/gosimruntime.goroutineEntrypoint
+         0     0%   100%        1MB  1.45%  github.com/jellevandenhooff/gosim/gosimruntime.initSharedGlobals.func1
+         0     0%   100%    64.44MB 93.46%  github.com/jellevandenhooff/gosim/gosimruntime.newMachine (inline)
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/gosimruntime.run
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/gosimruntime.run.func1
+         0     0%   100%    33.22MB 48.18%  github.com/jellevandenhooff/gosim/internal/coro.(*Coro).Start.func1
+         0     0%   100%    32.22MB 46.73%  github.com/jellevandenhooff/gosim/internal/coro.(*Upcallcoro).Upcall (inline)
+         0     0%   100%    32.22MB 46.73%  main.main
+         0     0%   100%    64.44MB 93.46%  reflect.New
+         0     0%   100%     0.50MB  0.73%  runtime.(*scavengerState).sleep
+         0     0%   100%     0.50MB  0.73%  runtime.(*timer).maybeAdd
+         0     0%   100%     0.50MB  0.73%  runtime.(*timer).modify
+         0     0%   100%     0.50MB  0.73%  runtime.(*timer).reset (inline)
+         0     0%   100%     0.50MB  0.73%  runtime.(*timers).addHeap
+         0     0%   100%     3.01MB  4.36%  runtime.allocm
+         0     0%   100%     0.50MB  0.73%  runtime.bgscavenge
+         0     0%   100%    33.22MB 48.18%  runtime.corostart
+         0     0%   100%     0.50MB  0.73%  runtime.growslice
+         0     0%   100%    32.22MB 46.73%  runtime.main
+         0     0%   100%        1MB  1.45%  runtime.mcall
+         0     0%   100%        2MB  2.91%  runtime.mstart
+         0     0%   100%        2MB  2.91%  runtime.mstart0
+         0     0%   100%        2MB  2.91%  runtime.mstart1
+         0     0%   100%     3.01MB  4.36%  runtime.newm
+         0     0%   100%     3.01MB  4.36%  runtime.newobject
+         0     0%   100%        1MB  1.45%  runtime.park_m
+         0     0%   100%     2.50MB  3.63%  runtime.resetspinning
+         0     0%   100%     3.01MB  4.36%  runtime.schedule
+         0     0%   100%     3.01MB  4.36%  runtime.startm
+         0     0%   100%     3.01MB  4.36%  runtime.wakep
+         0     0%   100%    32.22MB 46.73%  translated/github.com/jellevandenhooff/gosim/internal_/hooks/go127.runtimeImpl.Run
+         0     0%   100%    32.22MB 46.73%  translated/github.com/jellevandenhooff/gosim/internal_/simulation.(*Simulation).startMachine
+         0     0%   100%    32.22MB 46.73%  translated/github.com/jellevandenhooff/gosim/internal_/simulation.Runtime
+         0     0%   100%    32.22MB 46.73%  translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior_test.TestMain (inline)

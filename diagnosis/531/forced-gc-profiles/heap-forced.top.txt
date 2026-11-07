@@ -1,0 +1,28 @@
+File: behavior.test
+Build ID: 62304eeb368d4dd2dc18d423d8938180efbea5a1
+Type: inuse_space
+Time: 2026-11-07 23:08:47 CET
+Showing nodes accounting for 1.79GB, 98.95% of 1.81GB total
+Dropped 98 nodes (cum <= 0.01GB)
+      flat  flat%   sum%        cum   cum%
+    1.79GB 98.95% 98.95%     1.79GB 98.95%  reflect.unsafe_New
+         0     0% 98.95%     0.03GB  1.74%  github.com/jellevandenhooff/gosim/gosimruntime.(*goroutine).upcall (inline)
+         0     0% 98.95%     0.01GB  0.81%  github.com/jellevandenhooff/gosim/gosimruntime.InitGlobals
+         0     0% 98.95%     0.03GB  1.74%  github.com/jellevandenhooff/gosim/gosimruntime.NewMachine
+         0     0% 98.95%     0.03GB  1.74%  github.com/jellevandenhooff/gosim/gosimruntime.NewMachine.func1 (inline)
+         0     0% 98.95%     1.76GB 97.24%  github.com/jellevandenhooff/gosim/gosimruntime.TestMain
+         0     0% 98.95%     1.79GB 98.95%  github.com/jellevandenhooff/gosim/gosimruntime.allocGlobals
+         0     0% 98.95%     0.05GB  2.57%  github.com/jellevandenhooff/gosim/gosimruntime.goroutineEntrypoint
+         0     0% 98.95%     1.79GB 98.95%  github.com/jellevandenhooff/gosim/gosimruntime.newMachine (inline)
+         0     0% 98.95%     1.76GB 97.21%  github.com/jellevandenhooff/gosim/gosimruntime.run
+         0     0% 98.95%     0.05GB  2.57%  github.com/jellevandenhooff/gosim/gosimruntime.run.func1
+         0     0% 98.95%     0.05GB  2.57%  github.com/jellevandenhooff/gosim/internal/coro.(*Coro).Start.func1
+         0     0% 98.95%     0.03GB  1.74%  github.com/jellevandenhooff/gosim/internal/coro.(*Upcallcoro).Upcall (inline)
+         0     0% 98.95%     1.76GB 97.24%  main.main
+         0     0% 98.95%     1.79GB 98.95%  reflect.New
+         0     0% 98.95%     0.05GB  2.57%  runtime.corostart
+         0     0% 98.95%     1.76GB 97.24%  runtime.main
+         0     0% 98.95%     0.03GB  1.76%  translated/github.com/jellevandenhooff/gosim/internal_/hooks/go127.runtimeImpl.Run
+         0     0% 98.95%     0.03GB  1.74%  translated/github.com/jellevandenhooff/gosim/internal_/simulation.(*Simulation).startMachine
+         0     0% 98.95%     0.03GB  1.76%  translated/github.com/jellevandenhooff/gosim/internal_/simulation.Runtime
+         0     0% 98.95%     1.76GB 97.24%  translated/github.com/jellevandenhooff/gosim/internal_/tests/behavior_test.TestMain (inline)
