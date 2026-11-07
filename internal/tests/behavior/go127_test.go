@@ -149,6 +149,32 @@ func TestCPUTime(t *testing.T) {
 	}
 }
 
+// TestTimerFirings counts the timers that fire in a run.
+func TestTimerFirings(t *testing.T) {
+	before := gosim.TimerFirings()
+	time.Sleep(time.Second)
+	tk := time.NewTicker(time.Second)
+	for range 3 {
+		<-tk.C
+	}
+	tk.Stop()
+	fired := make(chan struct{})
+	time.AfterFunc(time.Second, func() { close(fired) })
+	<-fired
+	if got := gosim.TimerFirings() - before; got != 5 {
+		t.Errorf("%d timers fired, want 5: one sleep, three ticks, one AfterFunc", got)
+	}
+	// A tick nobody reads still fires: an unread ticker fires 3 times in
+	// 3.5 s, beside the sleep's end.
+	before = gosim.TimerFirings()
+	unread := time.NewTicker(time.Second)
+	time.Sleep(3500 * time.Millisecond)
+	unread.Stop()
+	if got := gosim.TimerFirings() - before; got != 4 {
+		t.Errorf("%d timers fired, want 4: three ticks nobody read and the end of a sleep", got)
+	}
+}
+
 // TestHostFile writes bytes to a file on the host and reads them back.
 func TestHostFile(t *testing.T) {
 	f, err := gosim.CreateHostFile()

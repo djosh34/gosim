@@ -49,6 +49,11 @@
 > - `gosim.CPUTime` returns the CPU time the whole process has used so far,
 >   user and system, on all threads. It counts earlier runs of the same
 >   binary too, so a caller takes the difference of two readings.
+> - `gosim.TimerFirings` counts how many times a timer fired in the current
+>   run: ends of `time.Sleep`, timers and tickers firing, dropped ticks
+>   included, and `AfterFunc` calls, the simulator's own timers too, such as
+>   the keepalives of idle simulated TCP connections. Reading it changes
+>   nothing in the run.
 > - `gosim.CreateHostFile` gives a simulation a file on the disk of the
 >   machine that runs it, outside the simulation, for more bytes than memory
 >   holds. Its reads and writes change nothing in the run, unless the host's

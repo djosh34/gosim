@@ -22,8 +22,9 @@ func Nanotime() int64 {
 }
 
 type clock struct {
-	now  int64 // unix nsec
-	heap *timerHeap
+	now   int64 // unix nsec
+	heap  *timerHeap
+	fired uint64
 }
 
 func newClock() *clock {
@@ -46,6 +47,7 @@ func (c *clock) maybefire() (*Timer, bool) {
 	}
 	if c.heap.peek().when <= c.now {
 		e := c.heap.pop()
+		c.fired++
 		return e, true
 	}
 	return nil, false
@@ -63,6 +65,13 @@ func (c *clock) doadvance() {
 	if checksummer := gs.get().checksummer; checksummer != nil {
 		checksummer.recordIntInt(checksumKeyTimeNow, uint64(c.now), 0)
 	}
+}
+
+// TimerFirings backs gosim.TimerFirings.
+//
+//go:norace
+func TimerFirings() uint64 {
+	return gs.get().clock.fired
 }
 
 func (c *clock) removemachine(m *Machine) {

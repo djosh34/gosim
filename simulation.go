@@ -104,6 +104,18 @@ func CPUTime() (time.Duration, error) {
 	return time.Duration(ns), err
 }
 
+// TimerFirings returns how many times a timer fired in the current run so
+// far, on every machine: the end of a time.Sleep, each time a timer or
+// ticker fires, also when its tick is dropped because nobody read the one
+// before, and each AfterFunc. It counts the simulator's own timers too,
+// such as the 15 s keepalive on each side of an idle simulated TCP
+// connection, so an idle run does not count zero. A simulation reads it to
+// count how often its code wakes up on time. Reading it changes nothing in
+// the run, and the same run counts the same.
+func TimerFirings() uint64 {
+	return gosimruntime.TimerFirings()
+}
+
 // A HostFile is a file on the disk of the machine that runs the
 // simulation, outside it, for a simulation that keeps more bytes than
 // memory holds. Its reads and writes go to the real disk at once and
