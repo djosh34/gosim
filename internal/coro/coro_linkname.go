@@ -27,20 +27,26 @@ type Coro struct {
 	coro *coro
 }
 
+// The race detector's synchronization goes through the runtime coroutine,
+// which newcoro allocates for each Start, never through the Coro: a Coro
+// can sit in a pooled goroutine, and its address would carry the history
+// of the coroutine that ran there before into the next one, which then
+// looks ordered after writes it is not (tigerstore#532).
+
 // Start starts the coroutine, running f in a new coroutine. It should be called only
 // once on a Coro. It lets the coroutine run until the first call to Yield or the final
 // call to Finish.
 //
 //go:norace
 func (c *Coro) Start(f func()) {
-	c.coro = newcoro(func(*coro) {
-		race.Acquire(unsafe.Pointer(c))
+	c.coro = newcoro(func(own *coro) {
+		race.Acquire(unsafe.Pointer(own))
 		f()
 		panic("wtf")
 	})
-	race.Release(unsafe.Pointer(c))
+	race.Release(unsafe.Pointer(c.coro))
 	coroswitch(c.coro)
-	race.Acquire(unsafe.Pointer(c))
+	race.Acquire(unsafe.Pointer(c.coro))
 }
 
 // Next must be called from outside the coroutine. It lets the coroutine run
@@ -48,9 +54,9 @@ func (c *Coro) Start(f func()) {
 //
 //go:norace
 func (c *Coro) Next() {
-	race.Release(unsafe.Pointer(c))
+	race.Release(unsafe.Pointer(c.coro))
 	coroswitch(c.coro)
-	race.Acquire(unsafe.Pointer(c))
+	race.Acquire(unsafe.Pointer(c.coro))
 }
 
 // Yield be called form inside the coroutine. It pauses the coroutine, yielding to
@@ -58,9 +64,9 @@ func (c *Coro) Next() {
 //
 //go:norace
 func (c *Coro) Yield() {
-	race.Release(unsafe.Pointer(c))
+	race.Release(unsafe.Pointer(c.coro))
 	coroswitch(c.coro)
-	race.Acquire(unsafe.Pointer(c))
+	race.Acquire(unsafe.Pointer(c.coro))
 }
 
 // Finish must be called from inside the coroutine. It stops the coroutine,
@@ -69,7 +75,7 @@ func (c *Coro) Yield() {
 //
 //go:norace
 func (c *Coro) Finish() {
-	race.Release(unsafe.Pointer(c))
+	race.Release(unsafe.Pointer(c.coro))
 	coroexit(c.coro)
 	panic("wtf")
 }

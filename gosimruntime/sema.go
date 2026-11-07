@@ -20,17 +20,22 @@ type sema struct {
 
 const semasSize = 251 // prime just like in runtime
 
-var semas [semasSize]*sema
-
-// TODO: store these structs on g instead or something?
-var semaPool []*sema
+// semaTable is a run's semaphores, by address, and the entries free for
+// reuse. It belongs to the run's scheduler: an entry holds the address it
+// waits on, which can point into a machine's globals, and an entry that a
+// crash left without waiters stays until its bucket is visited again. A
+// table shared by all runs kept every such run alive (tigerstore #531).
+type semaTable struct {
+	semas [semasSize]*sema
+	pool  []*sema
+}
 
 // TODO: clean up freeing code (no need to do two lookups)
 
 // cleanup/handle sema with empty sudog queue (can happen when crashing machines)
 //
 //go:norace
-func maybefree(semaPtr **sema) {
+func (t *semaTable) maybefree(semaPtr **sema) {
 	if *semaPtr == nil || (*semaPtr).q.first != nil {
 		return
 	}
@@ -40,7 +45,7 @@ func maybefree(semaPtr **sema) {
 		next := cur.next
 		cur.next = nil
 		cur.ptr = nil
-		semaPool = append(semaPool, cur)
+		t.pool = append(t.pool, cur)
 		cur = next
 	}
 	*semaPtr = cur
@@ -48,15 +53,17 @@ func maybefree(semaPtr **sema) {
 
 //go:norace
 func getsema(addr *uint32, alloc bool) *sema {
+	t := &gs.get().semas
+	semas := &t.semas
 	idx := (uintptr(unsafe.Pointer(addr)) >> 3) % semasSize
 
-	maybefree(&semas[idx])
+	t.maybefree(&semas[idx])
 	cur := semas[idx]
 	for cur != nil {
 		if cur.ptr == addr {
 			return cur
 		}
-		maybefree(&cur.next)
+		t.maybefree(&cur.next)
 		cur = cur.next
 	}
 
@@ -64,9 +71,9 @@ func getsema(addr *uint32, alloc bool) *sema {
 		return nil
 	}
 
-	if n := len(semaPool); n > 0 {
-		cur = semaPool[n-1]
-		semaPool = semaPool[:n-1]
+	if n := len(t.pool); n > 0 {
+		cur = t.pool[n-1]
+		t.pool = t.pool[:n-1]
 	} else {
 		cur = &sema{}
 	}
@@ -79,6 +86,8 @@ func getsema(addr *uint32, alloc bool) *sema {
 
 //go:norace
 func freesema(addr *uint32) {
+	t := &gs.get().semas
+	semas := &t.semas
 	idx := (uintptr(unsafe.Pointer(addr)) >> 3) % semasSize
 
 	if semas[idx].ptr == addr {
@@ -86,7 +95,7 @@ func freesema(addr *uint32) {
 		semas[idx] = semas[idx].next
 		freeing.ptr = nil
 		freeing.next = nil
-		semaPool = append(semaPool, freeing)
+		t.pool = append(t.pool, freeing)
 		return
 	}
 
@@ -97,7 +106,7 @@ func freesema(addr *uint32) {
 			cur.next = cur.next.next
 			freeing.ptr = nil
 			freeing.next = nil
-			semaPool = append(semaPool, freeing)
+			t.pool = append(t.pool, freeing)
 			return
 		}
 		cur = cur.next
