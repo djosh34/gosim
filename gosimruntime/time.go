@@ -22,9 +22,8 @@ func Nanotime() int64 {
 }
 
 type clock struct {
-	now  int64 // unix nsec
-	heap *timerHeap
-	// fired counts the timers that fired so far (TimerFirings).
+	now   int64 // unix nsec
+	heap  *timerHeap
 	fired uint64
 }
 
@@ -68,10 +67,7 @@ func (c *clock) doadvance() {
 	}
 }
 
-// TimerFirings returns how many timers fired in this run so far: each
-// wake-up of a goroutine from time.Sleep, each send on a timer's channel
-// and each call of an AfterFunc. A simulation reads it to count how often
-// its code wakes up on time. Reading it changes nothing in the run.
+// TimerFirings backs gosim.TimerFirings.
 //
 //go:norace
 func TimerFirings() uint64 {

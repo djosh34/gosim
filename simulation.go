@@ -104,9 +104,12 @@ func CPUTime() (time.Duration, error) {
 	return time.Duration(ns), err
 }
 
-// TimerFirings returns how many timers fired in the current run so far:
-// each wake-up from time.Sleep, each send on a timer's or ticker's channel
-// and each call of an AfterFunc, on every machine. A simulation reads it to
+// TimerFirings returns how many times a timer fired in the current run so
+// far, on every machine: the end of a time.Sleep, each time a timer or
+// ticker fires, also when its tick is dropped because nobody read the one
+// before, and each AfterFunc. It counts the simulator's own timers too,
+// such as the 15 s keepalive on each side of an idle simulated TCP
+// connection, so an idle run does not count zero. A simulation reads it to
 // count how often its code wakes up on time. Reading it changes nothing in
 // the run, and the same run counts the same.
 func TimerFirings() uint64 {
