@@ -75,6 +75,25 @@ func TestRaceTimer2(t *testing.T) {
 	<-done
 }
 
+// TestRaceTimer2Reset races two writes that only a goroutine reused from
+// the pool would order: the callback of an earlier timer ran on its
+// storage after the Reset that followed x = 1 (tigerstore#532).
+func TestRaceTimer2Reset(t *testing.T) {
+	var x int
+	_ = x
+
+	done := make(chan struct{})
+
+	early := time.NewTimer(10 * time.Millisecond)
+	time.AfterFunc(10*time.Millisecond, func() {
+		x = 2
+		close(done)
+	})
+	x = 1
+	early.Reset(10 * time.Millisecond)
+	<-done
+}
+
 func TestRaceTicker1(t *testing.T) {
 	// little song and dance to make sure we can read timer.C without racing
 	timer := time.NewTicker(10 * time.Millisecond)
