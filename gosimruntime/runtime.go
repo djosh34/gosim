@@ -98,6 +98,8 @@ func newMachine(label string) *Machine {
 type scheduler struct {
 	seed int64
 
+	semas semaTable
+
 	goroutines      intrusiveList[*goroutine]
 	runnable        intrusiveList[*goroutine]
 	nextGoroutineID int
