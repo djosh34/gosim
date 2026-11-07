@@ -65,6 +65,7 @@ func getsema(addr *uint32, alloc bool) *sema {
 
 	if n := len(semaPool); n > 0 {
 		cur = semaPool[n-1]
+		semaPool[n-1] = nil // the reused entry may now point into this run
 		semaPool = semaPool[:n-1]
 	} else {
 		cur = &sema{}
