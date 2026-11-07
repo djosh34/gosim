@@ -20,8 +20,6 @@ type sema struct {
 
 const semasSize = 251 // prime just like in runtime
 
-var semas [semasSize]*sema
-
 // TODO: store these structs on g instead or something?
 var semaPool []*sema
 
@@ -48,6 +46,7 @@ func maybefree(semaPtr **sema) {
 
 //go:norace
 func getsema(addr *uint32, alloc bool) *sema {
+	semas := &gs.get().semas
 	idx := (uintptr(unsafe.Pointer(addr)) >> 3) % semasSize
 
 	maybefree(&semas[idx])
@@ -79,6 +78,7 @@ func getsema(addr *uint32, alloc bool) *sema {
 
 //go:norace
 func freesema(addr *uint32) {
+	semas := &gs.get().semas
 	idx := (uintptr(unsafe.Pointer(addr)) >> 3) % semasSize
 
 	if semas[idx].ptr == addr {

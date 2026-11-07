@@ -98,6 +98,11 @@ func newMachine(label string) *Machine {
 type scheduler struct {
 	seed int64
 
+	// A semaphore's address can point into a machine's globals. Keep the
+	// table within the run: abort removes waiters but an empty entry can
+	// remain until its hash bucket is visited again.
+	semas [semasSize]*sema
+
 	goroutines      intrusiveList[*goroutine]
 	runnable        intrusiveList[*goroutine]
 	nextGoroutineID int
