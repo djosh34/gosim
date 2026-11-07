@@ -75,6 +75,24 @@ func TestRaceTimer2(t *testing.T) {
 	<-done
 }
 
+// Regression for tigerstore#532: a pooled timer goroutine must not acquire
+// the race history of the unrelated timer goroutine that used its storage.
+func TestRaceTimer2Reset(t *testing.T) {
+	var x int
+	_ = x
+
+	done := make(chan struct{})
+
+	early := time.NewTimer(10 * time.Millisecond)
+	time.AfterFunc(10*time.Millisecond, func() {
+		x = 2
+		close(done)
+	})
+	x = 1
+	early.Reset(10 * time.Millisecond)
+	<-done
+}
+
 func TestRaceTicker1(t *testing.T) {
 	// little song and dance to make sure we can read timer.C without racing
 	timer := time.NewTicker(10 * time.Millisecond)
