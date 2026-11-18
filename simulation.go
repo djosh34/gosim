@@ -190,6 +190,22 @@ func Stacks() []byte {
 	return gosimruntime.Stacks()
 }
 
+// Reseed sets the run's random stream from seed, as a run that starts with
+// seed sets it: the scheduler's picks and every random value drawn after
+// it, by math/rand, math/rand/v2, crypto/rand, select and new maps, come
+// from seed. A simulation calls it to start a part of a run that must
+// replay alone, such as each of many scenarios that start from one
+// shared state. The part replays alone when it starts in the same state
+// each time: at the same simulated time, with no other goroutine
+// runnable and no timer pending that it can observe, and with nothing it
+// reads made before Reseed, such as a map's order, a hash seed or bytes a
+// math/rand source buffered. Timers due at the same time fire in the
+// order they were set, whatever the heap held before. Goroutine IDs keep
+// counting, so logs and the run's checksum still differ.
+func Reseed(seed int64) {
+	gosimruntime.Reseed(seed)
+}
+
 // WriteArtifact saves a copy of data under name in the result of the current
 // run, for the test that started the run: a test using metatesting reads it
 // from RunResult.Artifacts. The simulation cannot read it back. Writing a name

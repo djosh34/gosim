@@ -11,7 +11,12 @@ type timers []*Timer
 func (h timers) Len() int { return len(h) }
 
 //go:norace
-func (h timers) Less(i, j int) bool { return h[i].when < h[j].when }
+func (h timers) Less(i, j int) bool {
+	if h[i].when != h[j].when {
+		return h[i].when < h[j].when
+	}
+	return h[i].seq < h[j].seq
+}
 
 //go:norace
 func (h timers) Swap(i, j int) {
@@ -40,8 +45,13 @@ func (h *timers) Pop() any {
 	return x
 }
 
+// timerHeap orders its timers by when, and timers due at the same time
+// by when they were set: not by the heap's past, so that what fires
+// after a Reseed does not depend on what ran before it.
 type timerHeap struct {
 	timers timers
+	// seq counts the timers set, and orders the timers due at once.
+	seq uint64
 }
 
 //go:norace
@@ -51,6 +61,8 @@ func newTimerHeap() *timerHeap {
 
 //go:norace
 func (h *timerHeap) add(t *Timer) {
+	h.seq++
+	t.seq = h.seq
 	heap.Push(&h.timers, t)
 }
 
@@ -60,6 +72,8 @@ func (h *timerHeap) adjust(t *Timer, when int64) {
 		panic(t)
 	}
 	t.when = when
+	h.seq++
+	t.seq = h.seq
 	heap.Fix(&h.timers, t.pos)
 }
 
