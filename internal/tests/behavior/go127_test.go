@@ -10,6 +10,7 @@ import (
 	"hash/maphash"
 	"io"
 	"io/fs"
+	mathrand "math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -429,4 +430,37 @@ func TestMaphashComparable(t *testing.T) {
 		t.Skip()
 	}
 	maphash.Comparable(maphash.MakeSeed(), "key")
+}
+
+// TestReseed draws the same values after each Reseed with one seed,
+// whatever ran before it, and other values after another seed.
+func TestReseed(t *testing.T) {
+	draw := func() []uint64 {
+		var out []uint64
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		for i := range 8 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				mu.Lock()
+				out = append(out, uint64(i)<<32|uint64(mathrand.Uint32()))
+				mu.Unlock()
+			}()
+		}
+		wg.Wait()
+		return out
+	}
+	gosim.Reseed(7)
+	first := draw()
+	draw()
+	time.Sleep(time.Second)
+	gosim.Reseed(7)
+	if again := draw(); !slices.Equal(first, again) {
+		t.Errorf("after the same seed: %v, then %v", first, again)
+	}
+	gosim.Reseed(8)
+	if other := draw(); slices.Equal(first, other) {
+		t.Errorf("seeds 7 and 8 drew the same: %v", other)
+	}
 }

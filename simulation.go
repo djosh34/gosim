@@ -190,6 +190,17 @@ func Stacks() []byte {
 	return gosimruntime.Stacks()
 }
 
+// Reseed sets the run's random state from seed: from then on, which
+// goroutine runs next and every random value the simulation draws depend
+// on seed and on what the simulation does, not on what ran before it.
+// Two runs that reach the same state, call Reseed with the same seed at
+// the same simulated time, and then do the same, play out the same way.
+// A simulation calls it to start a part of a run that must replay alone,
+// such as each of many scenarios that start from one shared state.
+func Reseed(seed int64) {
+	gosimruntime.Reseed(seed)
+}
+
 // WriteArtifact saves a copy of data under name in the result of the current
 // run, for the test that started the run: a test using metatesting reads it
 // from RunResult.Artifacts. The simulation cannot read it back. Writing a name
