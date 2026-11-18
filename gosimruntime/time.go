@@ -111,6 +111,9 @@ type Timer struct {
 	Machine *Machine
 
 	pos int
+	// seq is when the timer was last set, among the timers due at once
+	// (timerHeap).
+	seq uint64
 }
 
 // TODO: reconsider if the timer needs to be go:norace. Maybe do a pivot to

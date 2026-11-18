@@ -433,9 +433,21 @@ func TestMaphashComparable(t *testing.T) {
 }
 
 // TestReseed draws the same values after each Reseed with one seed,
-// whatever ran before it, and other values after another seed.
+// whatever ran before it, and other values after another seed. Its
+// goroutines wake at one instant from timers set after the Reseed, while
+// the timer heap holds a different past each time.
 func TestReseed(t *testing.T) {
-	draw := func() []uint64 {
+	round := func(seed int64, pending int) []uint64 {
+		// Timers that outlast the round give the heap another past.
+		for i := range pending {
+			tm := time.NewTimer(time.Hour + time.Duration(i))
+			defer tm.Stop()
+		}
+		// The clock moves only once no goroutine can run: the last
+		// round's goroutines have ended, as Reseed asks.
+		time.Sleep(time.Millisecond)
+		gosim.Reseed(seed)
+		at := time.Now().Add(time.Second)
 		var out []uint64
 		var wg sync.WaitGroup
 		var mu sync.Mutex
@@ -443,6 +455,7 @@ func TestReseed(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				time.Sleep(time.Until(at))
 				mu.Lock()
 				out = append(out, uint64(i)<<32|uint64(mathrand.Uint32()))
 				mu.Unlock()
@@ -451,16 +464,11 @@ func TestReseed(t *testing.T) {
 		wg.Wait()
 		return out
 	}
-	gosim.Reseed(7)
-	first := draw()
-	draw()
-	time.Sleep(time.Second)
-	gosim.Reseed(7)
-	if again := draw(); !slices.Equal(first, again) {
+	first := round(7, 0)
+	if again := round(7, 5); !slices.Equal(first, again) {
 		t.Errorf("after the same seed: %v, then %v", first, again)
 	}
-	gosim.Reseed(8)
-	if other := draw(); slices.Equal(first, other) {
+	if other := round(8, 3); slices.Equal(first, other) {
 		t.Errorf("seeds 7 and 8 drew the same: %v", other)
 	}
 }

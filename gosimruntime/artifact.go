@@ -2,7 +2,6 @@ package gosimruntime
 
 import (
 	"bytes"
-	mathrand "math/rand"
 	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/internal/race"
@@ -36,14 +35,4 @@ func (s *scheduler) takeArtifacts() map[string][]byte {
 	soFarMu.Lock()
 	defer soFarMu.Unlock()
 	return s.artifacts
-}
-
-// Reseed sets the run's random state from seed, as a run that started
-// with seed sets it: the scheduler's choices, and every random value the
-// simulation draws, from then on depend on seed and what the simulation
-// does, not on what ran before.
-func Reseed(seed int64) {
-	getg().upcall(func() {
-		gs.get().fastrander.state = mathrand.New(mathrand.NewSource(seed)).Uint64()
-	})
 }

@@ -6,6 +6,7 @@ package gosimruntime
 
 import (
 	"math/bits"
+	mathrand "math/rand"
 )
 
 func Fastrand64() uint64 {
@@ -18,6 +19,19 @@ func Fastrandn(n uint32) uint32 {
 
 type fastrander struct {
 	state uint64
+}
+
+// newFastrander is the random state of a run that starts with seed.
+func newFastrander(seed int64) fastrander {
+	return fastrander{state: mathrand.New(mathrand.NewSource(seed)).Uint64()}
+}
+
+// Reseed sets the run's random state from seed, as a run that starts with
+// seed sets it.
+func Reseed(seed int64) {
+	getg().upcall(func() {
+		gs.get().fastrander = newFastrander(seed)
+	})
 }
 
 func (f *fastrander) fastrandn(n uint32) uint32 {

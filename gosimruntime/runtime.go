@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	mathrand "math/rand"
 	"os"
 	"reflect"
 	"runtime"
@@ -142,14 +141,12 @@ type scheduler struct {
 func newScheduler(seed int64, logger logger, checksummer *checksummer, extraenv []string) *scheduler {
 	clock := newClock()
 
-	rand := mathrand.New(mathrand.NewSource(seed))
-
 	s := &scheduler{
 		seed:            seed,
 		goroutines:      make([]*goroutine, 0, 1024),
 		runnable:        make([]*goroutine, 0, 1024),
 		nextGoroutineID: 1,
-		fastrander:      fastrander{state: rand.Uint64()},
+		fastrander:      newFastrander(seed),
 		goroutinesById:  make(map[int]*goroutine),
 		clock:           clock,
 		nextEventID:     1,
