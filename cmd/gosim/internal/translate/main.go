@@ -521,7 +521,6 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 	})
 
 	allResults := make(map[string]*TranslatePackageResult)
-	cacheHits := make(map[Hash]bool)
 
 	uncachedPackages := make(map[string]struct{})
 	for pkgId, hash := range packageHashes {
@@ -533,7 +532,6 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 		}
 		if res != nil {
 			allResults[pkgId] = res
-			cacheHits[hash] = true // record cache hits so we don't update the cache for them
 		} else {
 			uncachedPackages[strings.TrimSuffix(pkg.PkgPath, "_test")] = struct{}{}
 		}
@@ -543,8 +541,10 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 
 	replacedPkgs, packageNames := buildReplacePackagesAndPackageNames(convertPkgs, allPkgs)
 
+	// Each package's translation goes into the cache as soon as it is done,
+	// so a translation that fails later keeps the work done so far.
 	buildInParallel(packageGraph, numWorkers, allResults, func(pkgId string, localResults map[string]*TranslatePackageResult) *TranslatePackageResult {
-		return translatePackage(&translatePackageArgs{
+		res := translatePackage(&translatePackageArgs{
 			cfg:                cfg,
 			pkg:                pkgById[pkgId],
 			replacedPkgs:       replacedPkgs,
@@ -553,16 +553,11 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 			importResults:      localResults,
 			pkgWithTypesAndAst: pkgsWithTypesAndAst[pkgId],
 		})
-	})
-
-	for pkgId, res := range allResults {
-		hash := packageHashes[pkgId]
-		if !cacheHits[hash] {
-			if err := cachePut(cache, hash, res); err != nil {
-				log.Fatal(err)
-			}
+		if err := cachePut(cache, packageHashes[pkgId], res); err != nil {
+			log.Fatal(err)
 		}
-	}
+		return res
+	})
 
 	writer := newOutputWriter()
 	for _, res := range allResults {
