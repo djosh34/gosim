@@ -184,3 +184,22 @@ func TestStatStdio(t *testing.T) {
 		}
 	}
 }
+
+// stdoutMode is set by an initializer that, as cockroachdb/ttycolor's,
+// panics when os.Stdout cannot be stat'ed. gosim runs every initializer
+// once outside any machine, before the machines run them.
+var stdoutMode = mustStat(os.Stdout)
+
+func mustStat(f *os.File) os.FileMode {
+	info, err := f.Stat()
+	if err != nil {
+		panic(err)
+	}
+	return info.Mode()
+}
+
+func TestInitializerStatsStdout(t *testing.T) {
+	if gosim.IsSim() && stdoutMode&os.ModeCharDevice == 0 {
+		t.Errorf("os.Stdout has mode %v", stdoutMode)
+	}
+}

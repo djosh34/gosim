@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net/netip"
 	"os"
+	"reflect"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -1977,4 +1978,24 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 	delete(l.mmaps, addr)
 
 	return nil
+}
+
+// noMachineSyscall answers a system call made outside any machine. That
+// happens when gosimruntime runs every package's initializers once to set
+// the globals that machines share: the other globals it computes there are
+// thrown away, but a panic is not. cockroachdb/ttycolor panics when it
+// cannot stat os.Stdout, so fstat of the standard files reports a terminal,
+// as on a machine (SysFstat). Every other call fails with ENOSYS.
+//
+//go:norace
+func noMachineSyscall(s *syscallabi.Syscall) {
+	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysFstat).Pointer() {
+		if fd := int(s.Int0); fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr {
+			stat := s.Ptr1.(*Stat_t)
+			*stat = Stat_t{Mode: syscall.S_IFCHR | 0o620, Blksize: 1024}
+			s.Errno = 0
+			return
+		}
+	}
+	s.Errno = uintptr(syscall.ENOSYS)
 }

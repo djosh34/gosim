@@ -48,9 +48,10 @@ var _ gosimOSIface = &GosimOS{}
 
 //go:norace
 func (os *GosimOS) dispatchSyscall(s *syscallabi.Syscall) {
-	// XXX: help this happens for globals in os
+	// Outside any machine, as in gosimruntime's shared pass over the
+	// package initializers.
 	if os == nil {
-		s.Errno = uintptr(syscall.ENOSYS)
+		noMachineSyscall(s)
 		return
 	}
 	os.dispatcher.Dispatch(s)
