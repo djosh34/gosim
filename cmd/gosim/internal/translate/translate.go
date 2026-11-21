@@ -608,6 +608,12 @@ func (t *packageTranslator) markSyncFuncsNorace(c *dstutil.Cursor) {
 	}
 }
 
+// isBuildConstraint reports whether a comment line is a build constraint:
+// //go:build, or // +build with or without the space.
+func isBuildConstraint(line string) bool {
+	return constraint.IsGoBuild(line) || constraint.IsPlusBuild(line)
+}
+
 func (t *packageTranslator) newRuntimeSelector(name string) *dst.Ident {
 	return &dst.Ident{
 		Name: name,
@@ -628,7 +634,7 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 		// file would be checked again without the tags of the translation.
 		// constraint.IsPlusBuild also knows //+build without a space.
 		for i, dec := range f.Decs.Start {
-			if constraint.IsGoBuild(dec) || constraint.IsPlusBuild(dec) {
+			if isBuildConstraint(dec) {
 				f.Decs.Start[i] = "//"
 			}
 		}
