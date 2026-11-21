@@ -194,6 +194,12 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 						// gosim does not translate, such as runtime.
 						decl.Decs.Start[i] = "// gosim unimplemented: " + val
 						unimplemented = true
+					} else if pkg == "reflect" && decl.Body == nil && !isStdPackage(t.pkgPath) {
+						// A package outside the standard library that reaches
+						// into reflect, as github.com/goccy/go-json does, links
+						// to internals that gosim's reflect does not have.
+						decl.Decs.Start[i] = "// gosim unimplemented: " + val
+						unimplemented = true
 					} else if newPkg, ok := t.replacedPkgs[pkg]; ok {
 						slog.Debug("rewriting linkname", "pkg", t.pkgPath, "name", decl.Name.Name)
 
@@ -394,4 +400,11 @@ func (t *packageTranslator) rewriteBigIntRand(c *dstutil.Cursor) {
 		Fun:  &dst.Ident{Name: "BigIntRand", Path: translatedHooksPackage},
 		Args: args,
 	})
+}
+
+// isStdPackage reports whether the package is in the standard library,
+// whose paths have no dot in their first element.
+func isStdPackage(pkgPath string) bool {
+	first, _, _ := strings.Cut(pkgPath, "/")
+	return !strings.Contains(first, ".")
 }

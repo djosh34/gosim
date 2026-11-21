@@ -58,6 +58,17 @@ func TestWallKill(t *testing.T) {
 	}
 }
 
+func TestReflectLinkname(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestReflectLinkname", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "unimplemented hook: github.com/jellevandenhooff/gosim/internal/tests/behavior/linkname.unsafeNew"; !run.Failed || run.Err != want {
+		t.Errorf("got failed %v, err %q; want err %q", run.Failed, run.Err, want)
+	}
+}
+
 func TestUnimplementedHook(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestUnimplementedHook", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})

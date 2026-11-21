@@ -20,3 +20,13 @@ func mallocgc(size uintptr, typ unsafe.Pointer, needzero bool) unsafe.Pointer
 func Bytes(n int) []byte {
 	return unsafe.Slice((*byte)(mallocgc(uintptr(n), nil, true)), n)
 }
+
+// unsafeNew reaches into reflect, as github.com/goccy/go-json does. gosim's
+// reflect has no such function, so in a simulation it is an unimplemented
+// hook.
+//
+//go:linkname unsafeNew reflect.unsafe_New
+func unsafeNew(typ unsafe.Pointer) unsafe.Pointer
+
+// New calls unsafeNew.
+func New() unsafe.Pointer { return unsafeNew(nil) }

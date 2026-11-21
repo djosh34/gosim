@@ -26,6 +26,7 @@ import (
 
 	"github.com/jellevandenhooff/gosim"
 	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/tests/behavior/linkname"
 )
 
 // Tests for what the Go 1.27 port added or changed.
@@ -310,6 +311,14 @@ func TestUnimplementedHook(t *testing.T) {
 		t.Error("recovered from an unimplemented hook")
 	}()
 	reflect.MapOf(reflect.TypeFor[string](), reflect.TypeFor[int]())
+}
+
+func TestReflectLinkname(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	linkname.New()
+	t.Error("the linkname into reflect returned")
 }
 
 func TestFatalUnlock(t *testing.T) {
