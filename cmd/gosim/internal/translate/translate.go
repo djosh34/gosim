@@ -3,6 +3,7 @@ package translate
 import (
 	"fmt"
 	"go/ast"
+	"go/build/constraint"
 	"go/token"
 	"go/types"
 	"log"
@@ -622,12 +623,12 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 		t.curPos = n.Pos()
 	}
 	if f, ok := c.Node().(*dst.File); ok {
+		// The translation chose the files already; a constraint left in a
+		// file would be checked again without the tags of the translation.
+		// constraint.IsPlusBuild also knows //+build without a space.
 		for i, dec := range f.Decs.Start {
-			if strings.HasPrefix(dec, "//go:build") {
-				f.Decs.Start[i] = "//" // "//gosim filtered: " + dec
-			}
-			if strings.HasPrefix(dec, "// +build") {
-				f.Decs.Start[i] = "//" // "//gosim filtered: " + dec
+			if constraint.IsGoBuild(dec) || constraint.IsPlusBuild(dec) {
+				f.Decs.Start[i] = "//"
 			}
 		}
 	}
