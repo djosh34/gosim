@@ -10,6 +10,8 @@ var hooksGo127 = map[packageSelector]packageSelector{
 
 	// FcntlFlock passes a pointer, which the generic Syscall path does not.
 	{Pkg: "golang.org/x/sys/unix", Selector: "FcntlFlock"}: {Pkg: hooksGo127Package},
+	// fcntl, behind FcntlInt, is written by hand, not generated.
+	{Pkg: "golang.org/x/sys/unix", Selector: "fcntl"}: {Pkg: hooksGo127Package},
 
 	// amd64 only?
 	{Pkg: "golang.org/x/sys/unix", Selector: "gettimeofday"}: {Pkg: hooksGo127Package},

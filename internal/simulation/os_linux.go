@@ -574,14 +574,14 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 		return 0, syscall.EINVAL
 	}
 
-	if fd == syscall.Stdout || fd == syscall.Stderr {
+	if stdio, ok := l.stdioFd(fd); ok && (stdio == syscall.Stdout || stdio == syscall.Stderr) {
 		buf := make([]byte, data.Len())
 		data.Read(buf)
 
 		buf = bytes.TrimSuffix(buf, []byte("\n"))
 
 		var source string
-		if fd == syscall.Stdout {
+		if stdio == syscall.Stdout {
 			source = "stdout"
 		} else {
 			source = "stderr"
@@ -956,8 +956,7 @@ func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t],
 
 	l.logfFor(invocation, "fstat %d", fd)
 
-	fdInternal, ok := l.files[fd]
-	if !ok && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
+	if _, isStdio := l.stdioFd(fd); isStdio {
 		// The standard files are a terminal's character device, which
 		// programs check before they write colors to it.
 		var stat syscall.Stat_t
@@ -966,6 +965,7 @@ func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t],
 		statBuf.Set(stat)
 		return nil
 	}
+	fdInternal, ok := l.files[fd]
 	if !ok {
 		return syscall.EBADFD
 	}
@@ -1123,6 +1123,8 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 			// XXX?
 			return syscall.EBADFD
 		}
+
+	case *stdioCopy:
 
 	case *Socket:
 		// Closing a socket closes its stream or listener, so the peer
@@ -1649,6 +1651,27 @@ func (customSyscallLogger) LogExitSysGetpeername(fd int, rsa *RawSockaddrAny, ad
 	logSyscallExit("SysGetpeername", syscall, addrAttr(unsafe.Pointer(rsa), *addrlen), "err", err)
 }
 
+// stdioCopy is a copy of a standard file, which fcntl's F_DUPFD makes: it
+// writes where the original does.
+type stdioCopy struct {
+	fd int
+}
+
+// stdioFd returns the standard file that fd is or copies, if any.
+func (l *LinuxOS) stdioFd(fd int) (int, bool) {
+	if c, ok := l.files[fd].(*stdioCopy); ok {
+		return c.fd, true
+	}
+	if _, ok := l.files[fd]; !ok && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
+		return fd, true
+	}
+	return 0, false
+}
+
+// SysFcntl copies the standard files with F_DUPFD and F_DUPFD_CLOEXEC, as
+// CockroachDB's logging does to keep the original stderr, and accepts
+// F_GETFD and F_SETFD, since a machine runs no other program to inherit
+// its files. Other commands fail with ENOSYS.
 func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Syscall) (val int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -1656,7 +1679,24 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Sysc
 		return 0, syscall.EINVAL
 	}
 
-	return 0, syscall.ENOSYS
+	_, isFile := l.files[fd]
+	stdio, isStdio := l.stdioFd(fd)
+	if !isFile && !isStdio {
+		return 0, syscall.EBADF
+	}
+	switch cmd {
+	case syscall.F_DUPFD, syscall.F_DUPFD_CLOEXEC:
+		if !isStdio {
+			return 0, syscall.ENOSYS
+		}
+		newFd := l.allocFd()
+		l.files[newFd] = &stdioCopy{fd: stdio}
+		return newFd, nil
+	case syscall.F_GETFD, syscall.F_SETFD:
+		return 0, nil
+	default:
+		return 0, syscall.ENOSYS
+	}
 }
 
 func (l *LinuxOS) SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err error) {
@@ -1985,7 +2025,7 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 // the globals that machines share: the other globals it computes there are
 // thrown away, but a panic is not. cockroachdb/ttycolor panics when it
 // cannot stat os.Stdout, so fstat of the standard files reports a terminal,
-// as on a machine (SysFstat). Initializers that make keys read random
+// as on a machine (SysFstat), and its logging copies stderr with fcntl. Initializers that make keys read random
 // bytes, which come from the run's random stream, as on a machine
 // (SysGetrandom). Every other call fails with ENOSYS.
 //
@@ -2001,6 +2041,15 @@ func noMachineSyscall(s *syscallabi.Syscall) {
 		s.R0 = uintptr(len(buf))
 		s.Errno = 0
 		return
+	}
+	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysFcntl).Pointer() {
+		fd, cmd := int(s.Int0), int(s.Int1)
+		if (cmd == syscall.F_DUPFD || cmd == syscall.F_DUPFD_CLOEXEC) && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
+			// The copy is thrown away with the pass; any number will do.
+			s.R0 = uintptr(100 + fd)
+			s.Errno = 0
+			return
+		}
 	}
 	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysFstat).Pointer() {
 		if fd := int(s.Int0); fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr {

@@ -49,3 +49,7 @@ func GolangOrgXSysUnix_gettimeofday(timeval unsafe.Pointer) syscall.Errno {
 func GolangOrgXSysUnix_FcntlFlock(fd uintptr, cmd int, lk *syscall.Flock_t) error {
 	return simulation.SyscallSysFcntlFlock(fd, cmd, lk)
 }
+
+func GolangOrgXSysUnix_fcntl(fd int, cmd, arg int) (int, error) {
+	return simulation.SyscallSysFcntl(fd, cmd, arg)
+}

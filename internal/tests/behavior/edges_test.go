@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/jellevandenhooff/gosim"
 )
 
@@ -221,5 +223,24 @@ func mustRandom() []byte {
 func TestInitializerReadsRandom(t *testing.T) {
 	if bytes.Equal(randomKey, make([]byte, 32)) {
 		t.Error("the key is all zeros")
+	}
+}
+
+// origStderr copies stderr in an initializer, as CockroachDB's logging
+// does, which gosim also runs outside any machine.
+var origStderr = func() *os.File {
+	fd, err := unix.FcntlInt(os.Stderr.Fd(), unix.F_DUPFD_CLOEXEC, 0)
+	if err != nil {
+		panic(err)
+	}
+	return os.NewFile(uintptr(fd), os.Stderr.Name())
+}()
+
+func TestCopyOfStderr(t *testing.T) {
+	if _, err := origStderr.Write([]byte("written to the copy of stderr\n")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := origStderr.Stat(); err != nil {
+		t.Fatal(err)
 	}
 }
