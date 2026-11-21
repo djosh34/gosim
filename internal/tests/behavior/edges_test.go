@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	"golang.org/x/sys/unix"
@@ -327,5 +328,29 @@ func TestAppend(t *testing.T) {
 	}
 	if got, err := os.ReadFile("record"); err != nil || string(got) != "one\ntwo\n" {
 		t.Errorf("got %q, %v", got, err)
+	}
+}
+
+// TestReadDirFile reads an open directory, which fails with EISDIR, and
+// lstats a directory, as CockroachDB does on its store.
+func TestReadDirFile(t *testing.T) {
+	setupRealDisk(t)
+	if err := os.Mkdir("dir", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open("dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.Read(make([]byte, 10)); !errors.Is(err, syscall.EISDIR) {
+		t.Errorf("read of a directory: got %v, want EISDIR", err)
+	}
+	if _, err := f.ReadAt(make([]byte, 10), 0); !errors.Is(err, syscall.EISDIR) {
+		t.Errorf("pread of a directory: got %v, want EISDIR", err)
+	}
+	info, err := os.Lstat("dir")
+	if err != nil || !info.IsDir() {
+		t.Errorf("lstat: got %v, %v", info, err)
 	}
 }

@@ -246,8 +246,9 @@ type (
 type Socklen uint32
 
 const (
-	_AT_FDCWD     = -0x64
-	_AT_REMOVEDIR = 0x200
+	_AT_FDCWD            = -0x64
+	_AT_REMOVEDIR        = 0x200
+	_AT_SYMLINK_NOFOLLOW = 0x100
 )
 
 // TODO: make functions instead return Errno again?
@@ -670,6 +671,9 @@ func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView, invocation *sys
 		if !f.flagRead {
 			return 0, syscall.EBADFD // XXX??
 		}
+		if l.isDir(f.inode) {
+			return 0, syscall.EISDIR
+		}
 
 		retn := l.machine.filesystem.Read(f.inode, f.pos, data)
 		f.pos += int64(retn)
@@ -867,6 +871,9 @@ func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64
 		return 0, syscall.EBADFD // XXX??
 	}
 
+	if l.isDir(f.inode) {
+		return 0, syscall.EISDIR
+	}
 	retn := l.machine.filesystem.Read(f.inode, offset, data)
 
 	return retn, nil
@@ -1012,7 +1019,9 @@ func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueVie
 		return err
 	}
 
-	if flags != 0 {
+	// There are no symbolic links, so not following them changes nothing:
+	// os.Lstat passes AT_SYMLINK_NOFOLLOW.
+	if flags&^_AT_SYMLINK_NOFOLLOW != 0 {
 		return syscall.EINVAL // XXX?
 	}
 
@@ -2108,4 +2117,11 @@ func (l *LinuxOS) SysFchmodat(dirfd int, path string, mode uint32, invocation *s
 		return syscall.EINVAL
 	}
 	return nil
+}
+
+// isDir reports whether the open inode is a directory, which read fails
+// on with EISDIR.
+func (l *LinuxOS) isDir(inode int) bool {
+	stat, err := l.machine.filesystem.Statfd(inode)
+	return err == nil && stat.IsDir
 }
