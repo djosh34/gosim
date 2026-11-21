@@ -55,7 +55,7 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
 			if slices.Index(PublicExportHacks[path], id.Name) == -1 {
-				log.Fatalf("need public export hack for %s.%s", path, id.Name)
+				t.addExportHack(path, id.Name)
 			}
 			id.Name = "GosimPublicExportHack" + id.Name
 		}
@@ -94,7 +94,7 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
 			if slices.Index(PublicExportHacks[path], id.Name) == -1 {
-				log.Fatalf("need public export hack for %s.%s", path, id.Name)
+				t.addExportHack(path, id.Name)
 			}
 			id.Name = "GosimPublicExportHack" + id.Name
 		}

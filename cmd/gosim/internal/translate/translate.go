@@ -407,6 +407,29 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		}
 	}
 
+	// Give the unexported types of other packages that this package names
+	// an exported alias there, one file each, so that every package that
+	// names a type writes the same file.
+	for _, pkgPath := range slices.Sorted(maps.Keys(translator.exportHacks)) {
+		outPkg, ok := args.replacedPkgs[pkgPath]
+		if !ok {
+			log.Fatalf("need public export hack for %s.%s, in a package gosim does not translate", pkgPath, translator.exportHacks[pkgPath][0])
+		}
+		for _, name := range translator.exportHacks[pkgPath] {
+			file, err := makePublicExportHackFile(args.packageNames[pkgPath], []string{name})
+			if err != nil {
+				log.Fatal(err)
+			}
+			bytes, err := dstFileToBytes(file, args.packageNames, nil, "main")
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := writer.stage(pathForFile(outPkg, "gosimexport_"+name+".go"), bytes); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+
 	// write a gosimaliashack.go file if needed
 	if kind == PackageKindBase {
 		// XXX: compute these automatically?
@@ -468,6 +491,11 @@ type packageTranslator struct {
 	needsUnsafe bool
 
 	unimplemented []gosimtool.UnimplementedHook
+
+	// exportHacks are the unexported types of other packages, by package
+	// path, that this package names and PublicExportHacks does not list.
+	// Each gets an exported alias in its own package.
+	exportHacks map[string][]string
 
 	forTest bool
 
@@ -765,6 +793,17 @@ func symbolName(pkg string, fn *dst.FuncDecl) string {
 	}
 	b.WriteString(fn.Name.Name)
 	return b.String()
+}
+
+// addExportHack records that the package names the unexported type name
+// of the package pkgPath.
+func (t *packageTranslator) addExportHack(pkgPath, name string) {
+	if t.exportHacks == nil {
+		t.exportHacks = make(map[string][]string)
+	}
+	if !slices.Contains(t.exportHacks[pkgPath], name) {
+		t.exportHacks[pkgPath] = append(t.exportHacks[pkgPath], name)
+	}
 }
 
 func makePublicExportHackFile(pkgName string, names []string) (*dst.File, error) {
