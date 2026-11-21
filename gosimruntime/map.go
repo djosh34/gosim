@@ -450,7 +450,13 @@ func (m *mapImpl[K, V]) UnsafePointer() unsafe.Pointer {
 	return unsafe.Pointer(m)
 }
 
+// SetIndex sets the key to value, or deletes the key if value is the zero
+// Value, as reflect.Value.SetMapIndex does.
 func (m *mapImpl[K, V]) SetIndex(key, value reflect.Value) {
+	if !value.IsValid() {
+		m.outer().Delete(key.Interface().(K))
+		return
+	}
 	m.outer().Set(key.Interface().(K), value.Interface().(V))
 }
 

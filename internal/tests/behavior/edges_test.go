@@ -274,3 +274,15 @@ func TestMapIndexMissing(t *testing.T) {
 		t.Error("MapIndex of a missing key is valid")
 	}
 }
+
+// TestSetMapIndexDeletes checks that SetMapIndex with the zero Value
+// deletes the key.
+func TestSetMapIndexDeletes(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	v := reflect.ValueOf(m)
+	v.SetMapIndex(reflect.ValueOf("a"), reflect.Value{})
+	v.SetMapIndex(reflect.ValueOf("c"), reflect.ValueOf(3))
+	if len(m) != 2 || m["b"] != 2 || m["c"] != 3 {
+		t.Errorf("got %v", m)
+	}
+}
