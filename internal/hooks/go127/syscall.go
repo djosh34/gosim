@@ -41,8 +41,14 @@ func Syscall_Getpagesize() int {
 	return 4096
 }
 
+// Syscall_Exit ends the machine's process: the machine stops as after a
+// clean shutdown, and what it wrote stays on its disk, as a process's
+// writes outlive it. The exit code goes nowhere; a machine's Wait returns.
+// os.Exit on the main machine ends the test.
 func Syscall_Exit(code int) {
-	gosimruntime.Unimplemented("syscall.Exit")
+	simulation.SyscallMachineStop(simulation.CurrentMachineID(), true)
+	// The stop ends every goroutine of the machine, this one too.
+	select {}
 }
 
 // The runtime keeps a copy of the environment for cgo, which the simulation

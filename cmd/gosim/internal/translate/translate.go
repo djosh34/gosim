@@ -314,6 +314,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 
 	hooks := maps.Clone(hooksGo127)
 	maps.Copy(hooks, hooksGensyscallGo127ByArch[args.cfg.GOARCH])
+	maps.Copy(hooks, thirdPartyHooksGo127)
 
 	translator := &packageTranslator{
 		typesInfo:           args.pkg.TypesInfo,

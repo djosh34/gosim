@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	mathrand "math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -311,6 +312,37 @@ func TestUnimplementedHook(t *testing.T) {
 		t.Error("recovered from an unimplemented hook")
 	}()
 	reflect.MapOf(reflect.TypeFor[string](), reflect.TypeFor[int]())
+}
+
+// TestExitStopsMachine checks that os.Exit on a machine stops it, that
+// nothing after os.Exit runs, and that what it wrote stays on its disk.
+func TestExitStopsMachine(t *testing.T) {
+	m := gosim.NewMachine(gosim.MachineConfig{
+		Label: "exit",
+		Addr:  netip.MustParseAddr("10.0.0.1"),
+		MainFunc: func() {
+			if err := os.WriteFile("before", []byte("kept"), 0o644); err != nil {
+				return
+			}
+			os.Exit(3)
+			_ = os.WriteFile("after", []byte("not kept"), 0o644)
+		},
+	})
+	m.Wait()
+	results := make(chan string, 2)
+	m.SetMainFunc(func() {
+		before, _ := os.ReadFile("before")
+		_, err := os.Stat("after")
+		results <- string(before)
+		results <- fmt.Sprint(os.IsNotExist(err))
+	})
+	m.Restart()
+	if got := <-results; got != "kept" {
+		t.Errorf("the file written before os.Exit holds %q", got)
+	}
+	if got := <-results; got != "true" {
+		t.Error("code after os.Exit ran")
+	}
 }
 
 func TestReflectLinkname(t *testing.T) {

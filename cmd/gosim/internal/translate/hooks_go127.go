@@ -229,6 +229,15 @@ var hooksGo127 = map[packageSelector]packageSelector{
 
 var hooksGensyscallGo127ByArch = map[string]map[packageSelector]packageSelector{}
 
+// thirdPartyHooksGo127 are hooks of packages outside the standard library,
+// for functions written in assembly, which gosim drops. TestHookSignatures
+// cannot load these packages, which are no dependencies of gosim; each
+// hook's comment gives the signature it copies.
+var thirdPartyHooksGo127 = map[packageSelector]packageSelector{
+	// func Get() int64, in github.com/petermattis/goid.
+	{Pkg: "github.com/petermattis/goid", Selector: "Get"}: {Pkg: hooksGo127Package},
+}
+
 // runtimeLinknameHooks are runtime functions that packages outside the
 // standard library declare without a body and link to with a go:linkname, as
 // Pebble does. A declaration that links to one calls its hook in

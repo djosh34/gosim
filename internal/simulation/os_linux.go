@@ -956,6 +956,15 @@ func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t],
 	l.logfFor(invocation, "fstat %d", fd)
 
 	fdInternal, ok := l.files[fd]
+	if !ok && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
+		// The standard files are a terminal's character device, which
+		// programs check before they write colors to it.
+		var stat syscall.Stat_t
+		stat.Mode = syscall.S_IFCHR | 0o620
+		stat.Blksize = 1024
+		statBuf.Set(stat)
+		return nil
+	}
 	if !ok {
 		return syscall.EBADFD
 	}

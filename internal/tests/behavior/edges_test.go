@@ -6,9 +6,12 @@ import (
 	"io/fs"
 	"math/big"
 	"math/rand"
+	"os"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/jellevandenhooff/gosim"
 )
 
 // Constructs that translation once got wrong.
@@ -164,5 +167,20 @@ func TestEmbedFSAsFS(t *testing.T) {
 	}
 	if _, err := fs.Stat(embedded, "missing"); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("a missing file: got %v", err)
+	}
+}
+
+// TestStatStdio stats the standard files, as cockroachdb/ttycolor does
+// when it starts. In a simulation they are character devices.
+func TestStatStdio(t *testing.T) {
+	for _, f := range []*os.File{os.Stdin, os.Stdout, os.Stderr} {
+		info, err := f.Stat()
+		if err != nil {
+			t.Fatalf("%s: %v", f.Name(), err)
+		}
+		// Natively, go test's output may be a pipe.
+		if gosim.IsSim() && info.Mode()&os.ModeCharDevice == 0 {
+			t.Errorf("%s: mode %v, not a character device", f.Name(), info.Mode())
+		}
 	}
 }

@@ -55,6 +55,19 @@
 >   gosim gives that package an exported alias of it
 >   (`GosimPublicExportHack<name>`), where upstream needed the type listed
 >   in `PublicExportHacks` first.
+> - `os.Exit` on a machine stops it as a clean shutdown does: what it
+>   wrote stays on its disk, and its `Wait` returns. On the main machine
+>   it ends the test.
+> - `fstat` of the standard files reports a character device, as a
+>   terminal is.
+> - Constructs that CockroachDB and its dependencies use translate: a
+>   type whose name, or whose package's name, a local declaration hides;
+>   `len` of a global array as an array length; maps keyed by channels;
+>   `go panic(x)`; `make` sizes of any integer type; `var _ T = nil`;
+>   `(*big.Int).Rand`; an `embed.FS` passed as an `fs.FS`; and `//+build`
+>   lines without a space. A package outside the standard library that
+>   links into `reflect` gets unimplemented hooks for those functions, and
+>   `github.com/petermattis/goid.Get` gets a hook.
 > - `metatesting.ForTestBinary` runs a test binary that `gosim build-tests`
 >   built, from any path, without checking that it is newer than its
 >   sources: a binary built once can be copied to the machines that run it.
