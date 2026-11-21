@@ -56,6 +56,10 @@ func Syscall_fstatat(dirfd int, path string, stat *simulation.Stat_t, flags int)
 	return simulation.SyscallSysFstatat(dirfd, path, stat, flags)
 }
 
+func Syscall_Fstatfs(fd int, buf *simulation.Statfs_t) (err error) {
+	return simulation.SyscallSysFstatfs(fd, buf)
+}
+
 func Syscall_Fsync(fd int) (err error) {
 	return simulation.SyscallSysFsync(fd)
 }
@@ -138,6 +142,10 @@ func Syscall_setsockopt(s int, level int, name int, val unsafe.Pointer, vallen u
 
 func Syscall_socket(domain int, typ int, proto int) (fd int, err error) {
 	return simulation.SyscallSysSocket(domain, typ, proto)
+}
+
+func Syscall_Statfs(path string, buf *simulation.Statfs_t) (err error) {
+	return simulation.SyscallSysStatfs(path, buf)
 }
 
 func Syscall_Uname(buf *simulation.Utsname) (err error) {

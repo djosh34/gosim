@@ -3,7 +3,7 @@
 
 > **This is djosh34/gosim**, a port of
 > [jellevandenhooff/gosim](https://github.com/jellevandenhooff/gosim) to
-> Go 1.27.2, made for [tigerstore](https://github.com/djosh34/tigerstore)'s
+> Go 1.27.4, made for [tigerstore](https://github.com/djosh34/tigerstore)'s
 > simulator. It keeps upstream's history, its MIT license and its module path,
 > so a user pins it with a `replace` directive:
 >
@@ -14,9 +14,20 @@
 >
 > What differs from upstream:
 >
-> - It supports Go 1.27.2 only. A newer Go needs its hooks checked again
+> - It supports Go 1.27.4 only. A newer Go needs its hooks checked again
 >   (`TestHookSignatures` in `cmd/gosim/internal/translate` checks every
 >   hook's signature against the Go source it replaces).
+> - The Go that runs gosim must be installed outside the module cache. A
+>   toolchain that `GOTOOLCHAIN` downloads lives in `GOMODCACHE`, and the Go
+>   command refuses gosim's overlays for files there.
+> - Packages outside the standard library may reach `runtime.fastrand`,
+>   `runtime.fastrandn`, `runtime.fastrand64` and `runtime.mallocgc` with a
+>   `go:linkname`, as Pebble does; gosim gives them hooks. `mallocgc` is
+>   only for memory without pointers, with a nil type.
+> - `statfs` and `fstatfs` report a file system of 1 TiB, all of it free;
+>   `fadvise64` accepts any valid advice and ignores it; `fcntl` record
+>   locks, through `syscall` or `golang.org/x/sys/unix`, are always granted,
+>   since a machine is one process and machines do not share files.
 > - The command, `cmd/gosim`, is a module of its own, so that its dependencies
 >   do not raise the versions in the user's `go.mod`. Build it from a module
 >   that replaces both `github.com/jellevandenhooff/gosim` and

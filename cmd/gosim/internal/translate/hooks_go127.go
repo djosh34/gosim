@@ -8,6 +8,9 @@ var hooksGo127 = map[packageSelector]packageSelector{
 	{Pkg: "golang.org/x/sys/unix", Selector: "Syscall6"}:          {Pkg: hooksGo127Package},
 	{Pkg: "golang.org/x/sys/unix", Selector: "SyscallNoError"}:    {Pkg: hooksGo127Package},
 
+	// FcntlFlock passes a pointer, which the generic Syscall path does not.
+	{Pkg: "golang.org/x/sys/unix", Selector: "FcntlFlock"}: {Pkg: hooksGo127Package},
+
 	// amd64 only?
 	{Pkg: "golang.org/x/sys/unix", Selector: "gettimeofday"}: {Pkg: hooksGo127Package},
 
@@ -225,6 +228,18 @@ var hooksGo127 = map[packageSelector]packageSelector{
 }
 
 var hooksGensyscallGo127ByArch = map[string]map[packageSelector]packageSelector{}
+
+// runtimeLinknameHooks are runtime functions that packages outside the
+// standard library declare without a body and link to with a go:linkname, as
+// Pebble does. A declaration that links to one calls its hook in
+// hooksGo127Package, named as RewriteSelector names it. The value is the
+// runtime function behind the linkname, for TestRuntimeLinknameHooks.
+var runtimeLinknameHooks = map[packageSelector]string{
+	{Pkg: "runtime", Selector: "fastrand"}:   "legacy_fastrand",
+	{Pkg: "runtime", Selector: "fastrandn"}:  "legacy_fastrandn",
+	{Pkg: "runtime", Selector: "fastrand64"}: "legacy_fastrand64",
+	{Pkg: "runtime", Selector: "mallocgc"}:   "mallocgc",
+}
 
 // acceptedgo127Linknames are linknames to packages gosim does not translate
 // that the translated code keeps.

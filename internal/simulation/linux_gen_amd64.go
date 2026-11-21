@@ -37,11 +37,13 @@ type linuxOSIface interface {
 	SysChdir(path string, invocation *syscallabi.Syscall) (err error)
 	SysClose(fd int, invocation *syscallabi.Syscall) (err error)
 	SysConnect(s int, addr unsafe.Pointer, addrlen Socklen, invocation *syscallabi.Syscall) (err error)
+	SysFadvise64(fd int, offset int64, length int64, advice int, invocation *syscallabi.Syscall) (err error)
 	SysFallocate(fd int, mode uint32, off int64, len int64, invocation *syscallabi.Syscall) (err error)
 	SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Syscall) (val int, err error)
 	SysFdatasync(fd int, invocation *syscallabi.Syscall) (err error)
 	SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err error)
 	SysFstat(fd int, stat syscallabi.ValueView[Stat_t], invocation *syscallabi.Syscall) (err error)
+	SysFstatfs(fd int, buf syscallabi.ValueView[Statfs_t], invocation *syscallabi.Syscall) (err error)
 	SysFsync(fd int, invocation *syscallabi.Syscall) (err error)
 	SysFtruncate(fd int, length int64, invocation *syscallabi.Syscall) (err error)
 	SysGetcwd(buf syscallabi.SliceView[byte], invocation *syscallabi.Syscall) (n int, err error)
@@ -65,6 +67,7 @@ type linuxOSIface interface {
 	SysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, invocation *syscallabi.Syscall) (err error)
 	SysSetsockopt(s int, level int, name int, val unsafe.Pointer, vallen uintptr, invocation *syscallabi.Syscall) (err error)
 	SysSocket(domain int, typ int, proto int, invocation *syscallabi.Syscall) (fd int, err error)
+	SysStatfs(path string, buf syscallabi.ValueView[Statfs_t], invocation *syscallabi.Syscall) (err error)
 	SysUname(buf syscallabi.ValueView[Utsname], invocation *syscallabi.Syscall) (err error)
 	SysUnlinkat(dirfd int, path string, flags int, invocation *syscallabi.Syscall) (err error)
 	SysWrite(fd int, p syscallabi.SliceView[byte], invocation *syscallabi.Syscall) (n int, err error)
@@ -348,6 +351,46 @@ func (baseSyscallLogger) LogExitSysConnect(s int, addr unsafe.Pointer, addrlen S
 }
 
 //go:norace
+func SyscallSysFadvise64(fd int, offset int64, length int64, advice int) (err error) {
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSysFadvise64
+	syscall.OS = linuxOS
+	syscall.Int0 = uintptr(fd)
+	syscall.Int1 = uintptr(offset)
+	syscall.Int2 = uintptr(length)
+	syscall.Int3 = uintptr(advice)
+	if logSyscalls {
+		syscall.Step = gosimruntime.Step()
+		syscallLogger.LogEntrySysFadvise64(fd, offset, length, advice, syscall)
+	}
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	if logSyscalls {
+		syscallLogger.LogExitSysFadvise64(fd, offset, length, advice, syscall, err)
+	}
+	return
+}
+
+//go:norace
+func trampolineSysFadvise64(syscall *syscallabi.Syscall) {
+	fd := int(syscall.Int0)
+	offset := int64(syscall.Int1)
+	length := int64(syscall.Int2)
+	advice := int(syscall.Int3)
+	err := syscall.OS.(*LinuxOS).SysFadvise64(fd, offset, length, advice, syscall)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+func (baseSyscallLogger) LogEntrySysFadvise64(fd int, offset int64, length int64, advice int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFadvise64", syscall)
+}
+
+func (baseSyscallLogger) LogExitSysFadvise64(fd int, offset int64, length int64, advice int, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFadvise64", syscall)
+}
+
+//go:norace
 func SyscallSysFallocate(fd int, mode uint32, off int64, len int64) (err error) {
 	syscall := syscallabi.GetGoroutineLocalSyscall()
 	syscall.Trampoline = trampolineSysFallocate
@@ -532,6 +575,43 @@ func (baseSyscallLogger) LogEntrySysFstat(fd int, stat *Stat_t, syscall *syscall
 
 func (baseSyscallLogger) LogExitSysFstat(fd int, stat *Stat_t, syscall *syscallabi.Syscall, err error) {
 	logSyscallExit("SysFstat", syscall)
+}
+
+//go:norace
+func SyscallSysFstatfs(fd int, buf *Statfs_t) (err error) {
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSysFstatfs
+	syscall.OS = linuxOS
+	syscall.Int0 = uintptr(fd)
+	syscall.Ptr1 = buf
+	if logSyscalls {
+		syscall.Step = gosimruntime.Step()
+		syscallLogger.LogEntrySysFstatfs(fd, buf, syscall)
+	}
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	if logSyscalls {
+		syscallLogger.LogExitSysFstatfs(fd, buf, syscall, err)
+	}
+	syscall.Ptr1 = nil
+	return
+}
+
+//go:norace
+func trampolineSysFstatfs(syscall *syscallabi.Syscall) {
+	fd := int(syscall.Int0)
+	buf := syscallabi.NewValueView(syscall.Ptr1.(*Statfs_t))
+	err := syscall.OS.(*LinuxOS).SysFstatfs(fd, buf, syscall)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+func (baseSyscallLogger) LogEntrySysFstatfs(fd int, buf *Statfs_t, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFstatfs", syscall)
+}
+
+func (baseSyscallLogger) LogExitSysFstatfs(fd int, buf *Statfs_t, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFstatfs", syscall)
 }
 
 //go:norace
@@ -1441,6 +1521,44 @@ func (baseSyscallLogger) LogExitSysSocket(domain int, typ int, proto int, syscal
 }
 
 //go:norace
+func SyscallSysStatfs(path string, buf *Statfs_t) (err error) {
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSysStatfs
+	syscall.OS = linuxOS
+	syscall.Ptr0 = path
+	syscall.Ptr1 = buf
+	if logSyscalls {
+		syscall.Step = gosimruntime.Step()
+		syscallLogger.LogEntrySysStatfs(path, buf, syscall)
+	}
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	if logSyscalls {
+		syscallLogger.LogExitSysStatfs(path, buf, syscall, err)
+	}
+	syscall.Ptr0 = nil
+	syscall.Ptr1 = nil
+	return
+}
+
+//go:norace
+func trampolineSysStatfs(syscall *syscallabi.Syscall) {
+	path := syscall.Ptr0.(string)
+	buf := syscallabi.NewValueView(syscall.Ptr1.(*Statfs_t))
+	err := syscall.OS.(*LinuxOS).SysStatfs(path, buf, syscall)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+func (baseSyscallLogger) LogEntrySysStatfs(path string, buf *Statfs_t, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysStatfs", syscall)
+}
+
+func (baseSyscallLogger) LogExitSysStatfs(path string, buf *Statfs_t, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysStatfs", syscall)
+}
+
+//go:norace
 func SyscallSysUname(buf *Utsname) (err error) {
 	syscall := syscallabi.GetGoroutineLocalSyscall()
 	syscall.Trampoline = trampolineSysUname
@@ -1570,6 +1688,8 @@ func IsHandledSyscall(trap uintptr) bool {
 		return true
 	case unix.SYS_CONNECT:
 		return true
+	case unix.SYS_FADVISE64:
+		return true
 	case unix.SYS_FALLOCATE:
 		return true
 	case unix.SYS_FCNTL:
@@ -1579,6 +1699,8 @@ func IsHandledSyscall(trap uintptr) bool {
 	case unix.SYS_FLOCK:
 		return true
 	case unix.SYS_FSTAT:
+		return true
+	case unix.SYS_FSTATFS:
 		return true
 	case unix.SYS_FSYNC:
 		return true
@@ -1625,6 +1747,8 @@ func IsHandledSyscall(trap uintptr) bool {
 	case unix.SYS_SETSOCKOPT:
 		return true
 	case unix.SYS_SOCKET:
+		return true
+	case unix.SYS_STATFS:
 		return true
 	case unix.SYS_UNAME:
 		return true
@@ -2311,6 +2435,8 @@ func SyscallName(trap uintptr) string {
 		return "SYS_RSEQ"
 	case unix.SYS_URETPROBE: // 335
 		return "SYS_URETPROBE"
+	case unix.SYS_UPROBE: // 336
+		return "SYS_UPROBE"
 	case unix.SYS_PIDFD_SEND_SIGNAL: // 424
 		return "SYS_PIDFD_SEND_SIGNAL"
 	case unix.SYS_IO_URING_SETUP: // 425
@@ -2389,6 +2515,24 @@ func SyscallName(trap uintptr) string {
 		return "SYS_LSM_LIST_MODULES"
 	case unix.SYS_MSEAL: // 462
 		return "SYS_MSEAL"
+	case unix.SYS_SETXATTRAT: // 463
+		return "SYS_SETXATTRAT"
+	case unix.SYS_GETXATTRAT: // 464
+		return "SYS_GETXATTRAT"
+	case unix.SYS_LISTXATTRAT: // 465
+		return "SYS_LISTXATTRAT"
+	case unix.SYS_REMOVEXATTRAT: // 466
+		return "SYS_REMOVEXATTRAT"
+	case unix.SYS_OPEN_TREE_ATTR: // 467
+		return "SYS_OPEN_TREE_ATTR"
+	case unix.SYS_FILE_GETATTR: // 468
+		return "SYS_FILE_GETATTR"
+	case unix.SYS_FILE_SETATTR: // 469
+		return "SYS_FILE_SETATTR"
+	case unix.SYS_LISTNS: // 470
+		return "SYS_LISTNS"
+	case unix.SYS_RSEQ_SLICE_YIELD: // 471
+		return "SYS_RSEQ_SLICE_YIELD"
 
 	default:
 		return "unknown"

@@ -149,3 +149,43 @@ func signatureShape(sig *types.Signature) string {
 }
 
 var sizes = types.SizesFor("gc", "arm64")
+
+// TestRuntimeLinknameHooks checks that every hook of runtimeLinknameHooks
+// exists and has the signature of the runtime function it stands in for.
+func TestRuntimeLinknameHooks(t *testing.T) {
+	for _, goarch := range []string{"amd64", "arm64"} {
+		pkgs, err := packages.Load(&packages.Config{
+			Mode:       packages.NeedName | packages.NeedTypes,
+			Env:        append(os.Environ(), "GOOS=linux", "GOARCH="+goarch, "CGO_ENABLED=0"),
+			BuildFlags: []string{"-tags", "sim"},
+			Overlay:    stdOverlay(),
+		}, "runtime", hooksGo127Package)
+		if err != nil {
+			t.Fatal(err)
+		}
+		byPath := make(map[string]*types.Package)
+		for _, pkg := range pkgs {
+			if len(pkg.Errors) > 0 {
+				t.Fatalf("%s: loading %s: %v", goarch, pkg.PkgPath, pkg.Errors)
+			}
+			byPath[pkg.PkgPath] = pkg.Types
+		}
+		for linked, impl := range runtimeLinknameHooks {
+			runtimeObj := byPath["runtime"].Scope().Lookup(impl)
+			if runtimeObj == nil {
+				t.Errorf("%s: runtime function %s behind %s.%s does not exist", goarch, impl, linked.Pkg, linked.Selector)
+				continue
+			}
+			name := RewriteSelector(linked.Pkg, linked.Selector)
+			hookObj := byPath[hooksGo127Package].Scope().Lookup(name)
+			if hookObj == nil {
+				t.Errorf("%s: hook %s for %s.%s does not exist", goarch, name, linked.Pkg, linked.Selector)
+				continue
+			}
+			want, got := signatureShape(runtimeObj.Type().(*types.Signature)), signatureShape(hookObj.Type().(*types.Signature))
+			if want != got {
+				t.Errorf("%s: hook %s for %s.%s has signature\n\t%s\nwant\n\t%s", goarch, name, linked.Pkg, linked.Selector, got, want)
+			}
+		}
+	}
+}

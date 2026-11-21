@@ -240,6 +240,7 @@ type (
 	RawSockaddrAny = syscall.RawSockaddrAny
 	Utsname        = syscall.Utsname
 	Stat_t         = syscall.Stat_t
+	Statfs_t       = syscall.Statfs_t
 )
 
 type Socklen uint32
@@ -1656,6 +1657,11 @@ func (l *LinuxOS) SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err
 	return nil
 }
 
+// SysFcntlFlock takes and tests POSIX record locks. A machine is one process,
+// and a process never conflicts with its own locks, while machines do not
+// share files. So every lock is granted, and F_GETLK finds no lock that
+// would block. The checks are those of Linux: the file must be open, for
+// reading to take a read lock and for writing to take a write lock.
 func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flock_t], invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -1663,7 +1669,120 @@ func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flo
 		return syscall.EINVAL
 	}
 
-	// TODO: reconsider
+	fdInternal, ok := l.files[int(fd)]
+	if !ok {
+		return syscall.EBADF
+	}
+	f, ok := fdInternal.(*OsFile)
+	if !ok {
+		return syscall.EINVAL
+	}
+
+	switch cmd {
+	case syscall.F_GETLK, syscall.F_SETLK, syscall.F_SETLKW:
+	default:
+		return syscall.EINVAL
+	}
+
+	lock := lk.Get()
+	switch lock.Type {
+	case syscall.F_RDLCK:
+		if cmd != syscall.F_GETLK && !f.flagRead {
+			return syscall.EBADF
+		}
+	case syscall.F_WRLCK:
+		if cmd != syscall.F_GETLK && !f.flagWrite {
+			return syscall.EBADF
+		}
+	case syscall.F_UNLCK:
+		if cmd == syscall.F_GETLK {
+			return syscall.EINVAL
+		}
+	default:
+		return syscall.EINVAL
+	}
+
+	if cmd == syscall.F_GETLK {
+		lock.Type = syscall.F_UNLCK
+		lk.Set(lock)
+	}
+	return nil
+}
+
+// The file system that statfs and fstatfs report: ext4's magic number, 4 KiB
+// blocks and 1 TiB, all of it free. The simulated disk has no size limit.
+const (
+	statfsMagic     = 0xef53
+	statfsBlockSize = 4096
+	statfsBlocks    = 1 << 28
+	statfsFiles     = 1 << 26
+	statfsNameLen   = 255
+)
+
+func fillStatfs(view syscallabi.ValueView[Statfs_t]) {
+	view.Set(Statfs_t{
+		Type:    statfsMagic,
+		Bsize:   statfsBlockSize,
+		Blocks:  statfsBlocks,
+		Bfree:   statfsBlocks,
+		Bavail:  statfsBlocks,
+		Files:   statfsFiles,
+		Ffree:   statfsFiles,
+		Namelen: statfsNameLen,
+		Frsize:  statfsBlockSize,
+	})
+}
+
+func (l *LinuxOS) SysStatfs(path string, buf syscallabi.ValueView[Statfs_t], invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	if _, err := l.machine.filesystem.Stat(l.workdirInode, path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		return syscall.EINVAL
+	}
+	fillStatfs(buf)
+	return nil
+}
+
+func (l *LinuxOS) SysFstatfs(fd int, buf syscallabi.ValueView[Statfs_t], invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	if _, ok := l.files[fd]; !ok {
+		return syscall.EBADF
+	}
+	fillStatfs(buf)
+	return nil
+}
+
+// SysFadvise64 accepts advice about a file's access pattern and ignores it:
+// the simulated disk has no page cache to read ahead into.
+func (l *LinuxOS) SysFadvise64(fd int, offset int64, length int64, advice int, invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	fdInternal, ok := l.files[fd]
+	if !ok {
+		return syscall.EBADF
+	}
+	if _, ok := fdInternal.(*OsFile); !ok {
+		return syscall.ESPIPE
+	}
+	if length < 0 || advice < 0 || advice > 5 {
+		return syscall.EINVAL
+	}
 	return nil
 }
 

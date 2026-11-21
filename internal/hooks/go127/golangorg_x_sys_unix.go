@@ -44,3 +44,9 @@ func GolangOrgXSysUnix_gettimeofday(timeval unsafe.Pointer) syscall.Errno {
 	gosimruntime.Unimplemented("golang.org/x/sys/unix.gettimeofday")
 	panic("unreachable")
 }
+
+// GolangOrgXSysUnix_FcntlFlock takes unix.Flock_t, which has the layout of
+// syscall.Flock_t.
+func GolangOrgXSysUnix_FcntlFlock(fd uintptr, cmd int, lk *syscall.Flock_t) error {
+	return simulation.SyscallSysFcntlFlock(fd, cmd, lk)
+}
