@@ -598,7 +598,7 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 			fmt.Sprintf("\tsyscall.OS = %s\n", osImplName) +
 			prepareCaller +
 			invokeLog +
-			fmt.Sprintf("\t%s.dispatchSyscall(syscall)\n", osImplName) +
+			fmt.Sprintf("\tif %s == nil {\n\t\tnoMachineSyscall(%q, syscall)\n\t} else {\n\t\t%s.dispatchSyscall(syscall)\n\t}\n", osImplName, ifaceName, osImplName) +
 			parseCallerText +
 			retLog +
 			cleanupCallerText +
@@ -664,10 +664,9 @@ var _ %s = &%s{}
 
 //go:norace
 func (os *%s) dispatchSyscall(s *syscallabi.Syscall) {
-	// Outside any machine, as in gosimruntime's shared pass over the
-	// package initializers.
+	// The callers handle a call outside any machine (noMachineSyscall).
 	if os == nil {
-		noMachineSyscall(s)
+		s.Errno = uintptr(syscall.ENOSYS)
 		return
 	}
 	os.dispatcher.Dispatch(s)

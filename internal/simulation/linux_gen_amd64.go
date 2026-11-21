@@ -79,10 +79,9 @@ var _ linuxOSIface = &LinuxOS{}
 
 //go:norace
 func (os *LinuxOS) dispatchSyscall(s *syscallabi.Syscall) {
-	// Outside any machine, as in gosimruntime's shared pass over the
-	// package initializers.
+	// The callers handle a call outside any machine (noMachineSyscall).
 	if os == nil {
-		noMachineSyscall(s)
+		s.Errno = uintptr(syscall.ENOSYS)
 		return
 	}
 	os.dispatcher.Dispatch(s)
@@ -99,7 +98,11 @@ func SyscallPollClose(fd int, desc *syscallabi.PollDesc) (code int) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntryPollClose(fd, desc, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("PollClose", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	code = int(syscall.R0)
 	if logSyscalls {
 		syscallLogger.LogExitPollClose(fd, desc, syscall, code)
@@ -136,7 +139,11 @@ func SyscallPollOpen(fd int, desc *syscallabi.PollDesc) (code int) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntryPollOpen(fd, desc, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("PollOpen", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	code = int(syscall.R0)
 	if logSyscalls {
 		syscallLogger.LogExitPollOpen(fd, desc, syscall, code)
@@ -175,7 +182,11 @@ func SyscallSysAccept4(s int, rsa *RawSockaddrAny, addrlen *Socklen, flags int) 
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysAccept4(s, rsa, addrlen, flags, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysAccept4", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	fd = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -218,7 +229,11 @@ func SyscallSysBind(s int, addr unsafe.Pointer, addrlen Socklen) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysBind(s, addr, addrlen, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysBind", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysBind(s, addr, addrlen, syscall, err)
@@ -255,7 +270,11 @@ func SyscallSysChdir(path string) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysChdir(path, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysChdir", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysChdir(path, syscall, err)
@@ -290,7 +309,11 @@ func SyscallSysClose(fd int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysClose(fd, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysClose", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysClose(fd, syscall, err)
@@ -326,7 +349,11 @@ func SyscallSysConnect(s int, addr unsafe.Pointer, addrlen Socklen) (err error) 
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysConnect(s, addr, addrlen, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysConnect", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysConnect(s, addr, addrlen, syscall, err)
@@ -366,7 +393,11 @@ func SyscallSysFadvise64(fd int, offset int64, length int64, advice int) (err er
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFadvise64(fd, offset, length, advice, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFadvise64", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFadvise64(fd, offset, length, advice, syscall, err)
@@ -406,7 +437,11 @@ func SyscallSysFallocate(fd int, mode uint32, off int64, len int64) (err error) 
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFallocate(fd, mode, off, len, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFallocate", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFallocate(fd, mode, off, len, syscall, err)
@@ -444,7 +479,11 @@ func SyscallSysFchmod(fd int, mode uint32) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFchmod(fd, mode, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFchmod", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFchmod(fd, mode, syscall, err)
@@ -481,7 +520,11 @@ func SyscallSysFchmodat(dirfd int, path string, mode uint32) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFchmodat(dirfd, path, mode, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFchmodat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFchmodat(dirfd, path, mode, syscall, err)
@@ -520,7 +563,11 @@ func SyscallSysFcntl(fd int, cmd int, arg int) (val int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFcntl(fd, cmd, arg, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFcntl", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	val = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -558,7 +605,11 @@ func SyscallSysFdatasync(fd int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFdatasync(fd, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFdatasync", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFdatasync(fd, syscall, err)
@@ -593,7 +644,11 @@ func SyscallSysFlock(fd int, how int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFlock(fd, how, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFlock", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFlock(fd, how, syscall, err)
@@ -629,7 +684,11 @@ func SyscallSysFstat(fd int, stat *Stat_t) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFstat(fd, stat, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFstat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFstat(fd, stat, syscall, err)
@@ -666,7 +725,11 @@ func SyscallSysFstatfs(fd int, buf *Statfs_t) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFstatfs(fd, buf, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFstatfs", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFstatfs(fd, buf, syscall, err)
@@ -702,7 +765,11 @@ func SyscallSysFsync(fd int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFsync(fd, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFsync", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFsync(fd, syscall, err)
@@ -737,7 +804,11 @@ func SyscallSysFtruncate(fd int, length int64) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysFtruncate(fd, length, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFtruncate", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysFtruncate(fd, length, syscall, err)
@@ -772,7 +843,11 @@ func SyscallSysGetcwd(buf []byte) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetcwd(buf, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetcwd", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -810,7 +885,11 @@ func SyscallSysGetdents64(fd int, buf []byte) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetdents64(fd, buf, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetdents64", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -850,7 +929,11 @@ func SyscallSysGetpeername(fd int, rsa *RawSockaddrAny, addrlen *Socklen) (err e
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetpeername(fd, rsa, addrlen, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetpeername", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysGetpeername(fd, rsa, addrlen, syscall, err)
@@ -887,7 +970,11 @@ func SyscallSysGetpid() (pid int) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetpid(syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetpid", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	pid = int(syscall.R0)
 	if logSyscalls {
 		syscallLogger.LogExitSysGetpid(syscall, pid)
@@ -921,7 +1008,11 @@ func SyscallSysGetrandom(buf []byte, flags int) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetrandom(buf, flags, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetrandom", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -961,7 +1052,11 @@ func SyscallSysGetsockname(fd int, rsa *RawSockaddrAny, addrlen *Socklen) (err e
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetsockname(fd, rsa, addrlen, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetsockname", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysGetsockname(fd, rsa, addrlen, syscall, err)
@@ -1003,7 +1098,11 @@ func SyscallSysGetsockopt(s int, level int, name int, val unsafe.Pointer, vallen
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysGetsockopt(s, level, name, val, vallen, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysGetsockopt", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysGetsockopt(s, level, name, val, vallen, syscall, err)
@@ -1044,7 +1143,11 @@ func SyscallSysListen(s int, n int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysListen(s, n, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysListen", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysListen(s, n, syscall, err)
@@ -1081,7 +1184,11 @@ func SyscallSysLseek(fd int, offset int64, whence int) (off int64, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysLseek(fd, offset, whence, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysLseek", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	off = int64(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1120,7 +1227,11 @@ func SyscallSysMadvise(b []byte, advice int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysMadvise(b, advice, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysMadvise", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysMadvise(b, advice, syscall, err)
@@ -1158,7 +1269,11 @@ func SyscallSysMkdirat(dirfd int, path string, mode uint32) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysMkdirat(dirfd, path, mode, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysMkdirat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysMkdirat(dirfd, path, mode, syscall, err)
@@ -1200,7 +1315,11 @@ func SyscallSysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, o
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysMmap(addr, length, prot, flags, fd, offset, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysMmap", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	xaddr = uintptr(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1242,7 +1361,11 @@ func SyscallSysMunmap(addr uintptr, length uintptr) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysMunmap(addr, length, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysMunmap", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysMunmap(addr, length, syscall, err)
@@ -1280,7 +1403,11 @@ func SyscallSysNewfstatat(fd int, path string, stat *Stat_t, flags int) (err err
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysNewfstatat(fd, path, stat, flags, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysNewfstatat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysNewfstatat(fd, path, stat, flags, syscall, err)
@@ -1322,7 +1449,11 @@ func SyscallSysOpenat(dirfd int, path string, flags int, mode uint32) (fd int, e
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysOpenat(dirfd, path, flags, mode, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysOpenat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	fd = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1364,7 +1495,11 @@ func SyscallSysPread64(fd int, p []byte, offset int64) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysPread64(fd, p, offset, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysPread64", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1405,7 +1540,11 @@ func SyscallSysPwrite64(fd int, p []byte, offset int64) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysPwrite64(fd, p, offset, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysPwrite64", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1445,7 +1584,11 @@ func SyscallSysRead(fd int, p []byte) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysRead(fd, p, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysRead", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1486,7 +1629,11 @@ func SyscallSysRenameat(olddirfd int, oldpath string, newdirfd int, newpath stri
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysRenameat(olddirfd, oldpath, newdirfd, newpath, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysRenameat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysRenameat(olddirfd, oldpath, newdirfd, newpath, syscall, err)
@@ -1529,7 +1676,11 @@ func SyscallSysSetsockopt(s int, level int, name int, val unsafe.Pointer, vallen
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysSetsockopt(s, level, name, val, vallen, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysSetsockopt", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysSetsockopt(s, level, name, val, vallen, syscall, err)
@@ -1570,7 +1721,11 @@ func SyscallSysSocket(domain int, typ int, proto int) (fd int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysSocket(domain, typ, proto, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysSocket", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	fd = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
@@ -1609,7 +1764,11 @@ func SyscallSysStatfs(path string, buf *Statfs_t) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysStatfs(path, buf, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysStatfs", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysStatfs(path, buf, syscall, err)
@@ -1646,7 +1805,11 @@ func SyscallSysUname(buf *Utsname) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysUname(buf, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysUname", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysUname(buf, syscall, err)
@@ -1683,7 +1846,11 @@ func SyscallSysUnlinkat(dirfd int, path string, flags int) (err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysUnlinkat(dirfd, path, flags, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysUnlinkat", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {
 		syscallLogger.LogExitSysUnlinkat(dirfd, path, flags, syscall, err)
@@ -1721,7 +1888,11 @@ func SyscallSysWrite(fd int, p []byte) (n int, err error) {
 		syscall.Step = gosimruntime.Step()
 		syscallLogger.LogEntrySysWrite(fd, p, syscall)
 	}
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysWrite", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	if logSyscalls {

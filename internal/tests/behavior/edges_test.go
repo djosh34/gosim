@@ -227,17 +227,15 @@ func TestInitializerReadsRandom(t *testing.T) {
 	}
 }
 
-// origStderr copies stderr in an initializer, as CockroachDB's logging
-// does, which gosim also runs outside any machine.
-var origStderr = func() *os.File {
+// TestCopyOfStderr copies stderr with fcntl, as CockroachDB's logging does
+// in an initializer.
+func TestCopyOfStderr(t *testing.T) {
 	fd, err := unix.FcntlInt(os.Stderr.Fd(), unix.F_DUPFD_CLOEXEC, 0)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	return os.NewFile(uintptr(fd), os.Stderr.Name())
-}()
-
-func TestCopyOfStderr(t *testing.T) {
+	origStderr := os.NewFile(uintptr(fd), os.Stderr.Name())
+	defer origStderr.Close()
 	if _, err := origStderr.Write([]byte("written to the copy of stderr\n")); err != nil {
 		t.Fatal(err)
 	}
@@ -308,5 +306,26 @@ func TestChmod(t *testing.T) {
 	}
 	if err := os.Chmod("missing", 0o700); !os.IsNotExist(err) {
 		t.Errorf("chmod of a missing file: got %v", err)
+	}
+}
+
+// TestAppend opens a file with O_APPEND twice, as CockroachDB records its
+// temp directories: each write goes to the end.
+func TestAppend(t *testing.T) {
+	setupRealDisk(t)
+	for _, line := range []string{"one\n", "two\n"} {
+		f, err := os.OpenFile("record", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.WriteString(line); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, err := os.ReadFile("record"); err != nil || string(got) != "one\ntwo\n" {
+		t.Errorf("got %q, %v", got, err)
 	}
 }

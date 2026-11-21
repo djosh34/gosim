@@ -48,10 +48,9 @@ var _ gosimOSIface = &GosimOS{}
 
 //go:norace
 func (os *GosimOS) dispatchSyscall(s *syscallabi.Syscall) {
-	// Outside any machine, as in gosimruntime's shared pass over the
-	// package initializers.
+	// The callers handle a call outside any machine (noMachineSyscall).
 	if os == nil {
-		noMachineSyscall(s)
+		s.Errno = uintptr(syscall.ENOSYS)
 		return
 	}
 	os.dispatcher.Dispatch(s)
@@ -63,7 +62,11 @@ func SyscallMachineGetLabel(machineID int) (label string, err error) {
 	syscall.Trampoline = trampolineMachineGetLabel
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineGetLabel", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	label = syscall.RPtr0.(string)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
@@ -86,7 +89,11 @@ func SyscallMachineInodeInfo(machineID int, inodeID int, info *fs.InodeInfo) {
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = uintptr(inodeID)
 	syscall.Ptr2 = info
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineInodeInfo", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	syscall.Ptr2 = nil
 	return
 }
@@ -108,7 +115,11 @@ func SyscallMachineNew(label string, addr string, program any) (machineID int) {
 	syscall.Ptr0 = label
 	syscall.Ptr1 = addr
 	syscall.Ptr2 = program
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineNew", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	machineID = int(syscall.R0)
 	syscall.Ptr0 = nil
 	syscall.Ptr1 = nil
@@ -133,7 +144,11 @@ func SyscallMachineRecoverInit(machineID int, program any) (iterID int) {
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
 	syscall.Ptr1 = program
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineRecoverInit", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	iterID = int(syscall.R0)
 	syscall.Ptr1 = nil
 	return
@@ -154,7 +169,11 @@ func SyscallMachineRecoverNext(iterID int) (machineID int, ok bool) {
 	syscall.Trampoline = trampolineMachineRecoverNext
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(iterID)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineRecoverNext", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	machineID = int(syscall.R0)
 	ok = syscallabi.BoolFromUintptr(syscall.R1)
 	return
@@ -175,7 +194,11 @@ func SyscallMachineRecoverRelease(iterID int) {
 	syscall.Trampoline = trampolineMachineRecoverRelease
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(iterID)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineRecoverRelease", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	return
 }
 
@@ -193,7 +216,11 @@ func SyscallMachineRestart(machineID int, partialDisk bool) (err error) {
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = syscallabi.BoolToUintptr(partialDisk)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineRestart", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -214,7 +241,11 @@ func SyscallMachineSetBootProgram(machineID int, program any) (err error) {
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
 	syscall.Ptr1 = program
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineSetBootProgram", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	return
@@ -236,7 +267,11 @@ func SyscallMachineSetSometimesCrashOnSync(machineID int, crash bool) (err error
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = syscallabi.BoolToUintptr(crash)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineSetSometimesCrashOnSync", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -257,7 +292,11 @@ func SyscallMachineStop(machineID int, graceful bool) {
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = syscallabi.BoolToUintptr(graceful)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineStop", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	return
 }
 
@@ -275,7 +314,11 @@ func SyscallMachineWait(machineID int) {
 	syscall.Trampoline = trampolineMachineWait
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(machineID)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("MachineWait", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	return
 }
 
@@ -293,7 +336,11 @@ func SyscallSetConnected(a string, b string, connected bool) (err error) {
 	syscall.Ptr0 = a
 	syscall.Ptr1 = b
 	syscall.Int2 = syscallabi.BoolToUintptr(connected)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("SetConnected", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
 	syscall.Ptr1 = nil
@@ -318,7 +365,11 @@ func SyscallSetDelay(a string, b string, delay time.Duration) (err error) {
 	syscall.Ptr0 = a
 	syscall.Ptr1 = b
 	syscall.Int2 = uintptr(delay)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("SetDelay", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
 	syscall.Ptr1 = nil
@@ -341,7 +392,11 @@ func SyscallSetSimulationTimeout(timeout time.Duration) (err error) {
 	syscall.Trampoline = trampolineSetSimulationTimeout
 	syscall.OS = gosimOS
 	syscall.Int0 = uintptr(timeout)
-	gosimOS.dispatchSyscall(syscall)
+	if gosimOS == nil {
+		noMachineSyscall("SetSimulationTimeout", syscall)
+	} else {
+		gosimOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }

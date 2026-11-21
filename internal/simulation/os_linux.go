@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"net/netip"
 	"os"
-	"reflect"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -279,6 +278,8 @@ type OsFile struct {
 	name                string
 	pos                 int64
 	flagRead, flagWrite bool
+	// flagAppend is O_APPEND: every write goes to the end of the file.
+	flagAppend bool
 
 	didReaddir bool // XXX JANK
 }
@@ -337,7 +338,7 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	// TODO: check mode
 
 	const flagSupported = os.O_RDONLY | os.O_WRONLY | os.O_RDWR |
-		os.O_CREATE | os.O_EXCL | os.O_TRUNC
+		os.O_CREATE | os.O_EXCL | os.O_TRUNC | os.O_APPEND
 
 	if flags&(^flagSupported) != 0 {
 		return 0, syscall.EINVAL // XXX?
@@ -356,7 +357,8 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 		return 0, syscall.EINVAL // XXX?
 	}
 
-	inode, err := l.machine.filesystem.OpenFile(dirInode, path, flags)
+	flagAppend := flags&os.O_APPEND != 0
+	inode, err := l.machine.filesystem.OpenFile(dirInode, path, flags&^os.O_APPEND)
 	if err != nil {
 		return 0, err
 	}
@@ -366,11 +368,12 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	// TODO: this pos is wrong for writing maybe? what should happen when you
 	// open a file that already exists and start writing to it?
 	f := &OsFile{
-		name:      path,
-		inode:     inode,
-		pos:       0,
-		flagRead:  flagRead,
-		flagWrite: flagWrite,
+		name:       path,
+		inode:      inode,
+		pos:        0,
+		flagRead:   flagRead,
+		flagWrite:  flagWrite,
+		flagAppend: flagAppend,
 	}
 
 	fd := l.allocFd()
@@ -606,6 +609,13 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 			return 0, syscall.EBADFD
 		}
 
+		if f.flagAppend {
+			stat, err := l.machine.filesystem.Statfd(f.inode)
+			if err != nil {
+				return 0, syscall.EBADFD
+			}
+			f.pos = stat.Size
+		}
 		retn := l.machine.filesystem.Write(f.inode, f.pos, data)
 		f.pos += int64(retn)
 
@@ -2023,15 +2033,21 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 // noMachineSyscall answers a system call made outside any machine. That
 // happens when gosimruntime runs every package's initializers once to set
 // the globals that machines share: the other globals it computes there are
-// thrown away, but a panic is not. cockroachdb/ttycolor panics when it
-// cannot stat os.Stdout, so fstat of the standard files reports a terminal,
-// as on a machine (SysFstat), and its logging copies stderr with fcntl. Initializers that make keys read random
-// bytes, which come from the run's random stream, as on a machine
-// (SysGetrandom). Every other call fails with ENOSYS.
+// thrown away, but a panic is not. Each generated caller passes the name
+// of its call when there is no machine.
+//
+// cockroachdb/ttycolor panics when it cannot stat os.Stdout, so fstat of
+// the standard files reports a terminal, as on a machine (SysFstat).
+// CockroachDB's logging copies stderr with fcntl. Initializers that make
+// keys read random bytes, which come from the run's random stream, as on
+// a machine (SysGetrandom). Every other call fails with ENOSYS.
 //
 //go:norace
-func noMachineSyscall(s *syscallabi.Syscall) {
-	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysGetrandom).Pointer() {
+func noMachineSyscall(name string, s *syscallabi.Syscall) {
+	// The goroutine reuses its Syscall: clear what an earlier call left.
+	s.R0, s.R1 = 0, 0
+	switch name {
+	case "SysGetrandom":
 		buf := unsafe.Slice(s.Ptr0.(*byte), int(s.Int0))
 		for i := 0; i < len(buf); i += 8 {
 			var word [8]byte
@@ -2041,8 +2057,7 @@ func noMachineSyscall(s *syscallabi.Syscall) {
 		s.R0 = uintptr(len(buf))
 		s.Errno = 0
 		return
-	}
-	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysFcntl).Pointer() {
+	case "SysFcntl":
 		fd, cmd := int(s.Int0), int(s.Int1)
 		if (cmd == syscall.F_DUPFD || cmd == syscall.F_DUPFD_CLOEXEC) && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
 			// The copy is thrown away with the pass; any number will do.
@@ -2050,8 +2065,7 @@ func noMachineSyscall(s *syscallabi.Syscall) {
 			s.Errno = 0
 			return
 		}
-	}
-	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysFstat).Pointer() {
+	case "SysFstat":
 		if fd := int(s.Int0); fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr {
 			stat := s.Ptr1.(*Stat_t)
 			*stat = Stat_t{Mode: syscall.S_IFCHR | 0o620, Blksize: 1024}
