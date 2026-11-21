@@ -30,3 +30,9 @@ func unsafeNew(typ unsafe.Pointer) unsafe.Pointer
 
 // New calls unsafeNew.
 func New() unsafe.Pointer { return unsafeNew(nil) }
+
+// Typelinks reads the type sections, as github.com/goccy/go-json does in an
+// initializer. In a simulation there are none.
+//
+//go:linkname Typelinks reflect.typelinks
+func Typelinks() ([]unsafe.Pointer, [][]int32)

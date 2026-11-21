@@ -194,6 +194,13 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 						// gosim does not translate, such as runtime.
 						decl.Decs.Start[i] = "// gosim unimplemented: " + val
 						unimplemented = true
+					} else if _, ok := runtimeLinknameHooks[packageSelector{Pkg: pkg, Selector: name}]; ok && decl.Body == nil {
+						hooks := hooksGo127Package
+						if replaced, ok := t.replacedPkgs[hooks]; ok {
+							hooks = replaced
+						}
+						parts[2] = fmt.Sprintf("%s.%s", hooks, RewriteSelector(pkg, name))
+						decl.Decs.Start[i] = strings.Join(parts, " ")
 					} else if pkg == "reflect" && decl.Body == nil && !isStdPackage(t.pkgPath) {
 						// A package outside the standard library that reaches
 						// into reflect, as github.com/goccy/go-json does, links
@@ -207,13 +214,6 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 						decl.Decs.Start[i] = strings.Join(parts, " ")
 					} else if t.acceptedLinknames[packageSelector{Pkg: t.pkgPath, Selector: decl.Name.Name}] == (packageSelector{Pkg: pkg, Selector: name}) {
 						slog.Debug("keeping linkname", "pkg", t.pkgPath, "name", decl.Name.Name, "targetPkg", pkg, "targetName", name)
-					} else if _, ok := runtimeLinknameHooks[packageSelector{Pkg: pkg, Selector: name}]; ok && decl.Body == nil {
-						hooks := hooksGo127Package
-						if replaced, ok := t.replacedPkgs[hooks]; ok {
-							hooks = replaced
-						}
-						parts[2] = fmt.Sprintf("%s.%s", hooks, RewriteSelector(pkg, name))
-						decl.Decs.Start[i] = strings.Join(parts, " ")
 					} else if strings.HasPrefix(pkg, "gosimnotranslate/") {
 						parts[2] = fmt.Sprintf("%s.%s", strings.TrimPrefix(pkg, "gosimnotranslate/"), name)
 						decl.Decs.Start[i] = strings.Join(parts, " ")

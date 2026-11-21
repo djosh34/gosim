@@ -38,3 +38,9 @@ func Runtime_mallocgc(size uintptr, typ unsafe.Pointer, needzero bool) unsafe.Po
 
 // zerobase is the address of every allocation of 0 bytes, as in the runtime.
 var zerobase uintptr
+
+// Reflect_typelinks reports no type sections: the simulation's types do not
+// come from one.
+func Reflect_typelinks() ([]unsafe.Pointer, [][]int32) {
+	return nil, nil
+}

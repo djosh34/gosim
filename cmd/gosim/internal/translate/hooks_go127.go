@@ -238,16 +238,20 @@ var thirdPartyHooksGo127 = map[packageSelector]packageSelector{
 	{Pkg: "github.com/petermattis/goid", Selector: "Get"}: {Pkg: hooksGo127Package},
 }
 
-// runtimeLinknameHooks are runtime functions that packages outside the
-// standard library declare without a body and link to with a go:linkname, as
-// Pebble does. A declaration that links to one calls its hook in
+// runtimeLinknameHooks are runtime and reflect functions that packages
+// outside the standard library declare without a body and link to with a
+// go:linkname, as Pebble and github.com/goccy/go-json do. A declaration that links to one calls its hook in
 // hooksGo127Package, named as RewriteSelector names it. The value is the
-// runtime function behind the linkname, for TestRuntimeLinknameHooks.
+// function of the runtime package behind the linkname, for
+// TestRuntimeLinknameHooks.
 var runtimeLinknameHooks = map[packageSelector]string{
 	{Pkg: "runtime", Selector: "fastrand"}:   "legacy_fastrand",
 	{Pkg: "runtime", Selector: "fastrandn"}:  "legacy_fastrandn",
 	{Pkg: "runtime", Selector: "fastrand64"}: "legacy_fastrand64",
 	{Pkg: "runtime", Selector: "mallocgc"}:   "mallocgc",
+	// github.com/goccy/go-json reads the type sections in an initializer;
+	// with none, it keeps its caches in maps.
+	{Pkg: "reflect", Selector: "typelinks"}: "reflect_typelinks",
 }
 
 // acceptedgo127Linknames are linknames to packages gosim does not translate

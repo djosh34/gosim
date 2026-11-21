@@ -3,6 +3,8 @@ package behavior_test
 import (
 	"testing"
 
+	"github.com/jellevandenhooff/gosim"
+
 	"github.com/jellevandenhooff/gosim/internal/tests/behavior/linkname"
 )
 
@@ -28,5 +30,15 @@ func TestRuntimeLinknames(t *testing.T) {
 	}
 	if len(linkname.Bytes(0)) != 0 {
 		t.Error("0 bytes")
+	}
+}
+
+func TestTypelinks(t *testing.T) {
+	sections, offsets := linkname.Typelinks()
+	if gosim.IsSim() && (sections != nil || offsets != nil) {
+		t.Errorf("got %d sections in a simulation", len(sections))
+	}
+	if !gosim.IsSim() && len(sections) == 0 {
+		t.Error("no type sections")
 	}
 }
