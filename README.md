@@ -51,6 +51,9 @@
 > - A simulated program can pass data to the test that runs it with
 >   `gosim.WriteArtifact`; `metatesting.RunResult.Artifacts` holds it, and
 >   `MetaT.RunQuiet` runs a test without logging its output.
+> - `metatesting.ForTestBinary` runs a test binary that `gosim build-tests`
+>   built, from any path, without checking that it is newer than its
+>   sources: a binary built once can be copied to the machines that run it.
 > - A run can have limits of real time (`metatesting.RunConfig.WallLimit` and
 >   `WallKill`). The simulation reads the first with `gosim.WallLimitPassed`
 >   and stops itself, with `gosim.Stacks` for its report. The second ends a

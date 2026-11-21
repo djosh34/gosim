@@ -4,11 +4,14 @@ package behavior_test
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jellevandenhooff/gosim/internal/gosimtool"
 	"github.com/jellevandenhooff/gosim/metatesting"
 )
 
@@ -98,5 +101,22 @@ func TestMaphashComparable(t *testing.T) {
 	}
 	if want := "unimplemented hook: hash/maphash.comparableHashUnimplemented"; !run.Failed || run.Err != want {
 		t.Errorf("got failed %v, err %q; want err %q\n%s", run.Failed, run.Err, want, run.LogOutput)
+	}
+}
+
+func TestForTestBinary(t *testing.T) {
+	// A copy of the binary elsewhere, as a campaign's jobs download it.
+	built := gosimtool.GetPathForPrecompiledTestBinary(t, "github.com/jellevandenhooff/gosim/internal/tests/behavior", nil)
+	data, err := os.ReadFile(built)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "behavior.test")
+	if err := os.WriteFile(path, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run, err := metatesting.ForTestBinary(t, path).RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1})
+	if err != nil || run.Failed || string(run.Artifacts["artifact.txt"]) != "hello" {
+		t.Errorf("got %v, %+v", err, run)
 	}
 }
