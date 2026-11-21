@@ -394,9 +394,22 @@ func SliceOf(t Type) Type {
 	return wrapType(reflect.SliceOf(t.(*typeImpl).inner))
 }
 
+// StructOf builds the struct type with the real reflect: the fields' types
+// are translated types already, such as gosimruntime.Map for a map.
 func StructOf(fields []StructField) Type {
-	gosimruntime.Unimplemented("reflect.StructOf")
-	panic("unreachable")
+	inner := make([]reflect.StructField, len(fields))
+	for i, f := range fields {
+		inner[i] = reflect.StructField{
+			Name:      f.Name,
+			PkgPath:   f.PkgPath,
+			Type:      f.Type.(*typeImpl).inner,
+			Tag:       reflect.StructTag(f.Tag),
+			Offset:    f.Offset,
+			Index:     f.Index,
+			Anonymous: f.Anonymous,
+		}
+	}
+	return wrapType(reflect.StructOf(inner))
 }
 
 func ArrayOf(length int, elem Type) Type {

@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -242,5 +243,22 @@ func TestCopyOfStderr(t *testing.T) {
 	}
 	if _, err := origStderr.Stat(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestStructOf builds a struct type at run time, as CockroachDB's
+// schemachanger/rel does in its initializers.
+func TestStructOf(t *testing.T) {
+	typ := reflect.StructOf([]reflect.StructField{
+		{Name: "A", Type: reflect.TypeFor[int](), Tag: `json:"a"`},
+		{Name: "B", Type: reflect.TypeFor[map[string]int]()},
+	})
+	if typ.NumField() != 2 || typ.Field(0).Tag.Get("json") != "a" || typ.Field(1).Type.Kind() != reflect.Map {
+		t.Fatalf("got %v", typ)
+	}
+	v := reflect.New(typ).Elem()
+	v.Field(0).SetInt(7)
+	if v.Field(0).Int() != 7 {
+		t.Errorf("got %v", v.Field(0).Int())
 	}
 }
