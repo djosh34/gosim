@@ -262,3 +262,15 @@ func TestStructOf(t *testing.T) {
 		t.Errorf("got %v", v.Field(0).Int())
 	}
 }
+
+// TestMapIndexMissing checks that MapIndex of a missing key is not valid,
+// which YAML decoders use to find duplicate keys.
+func TestMapIndexMissing(t *testing.T) {
+	m := reflect.ValueOf(map[string]int{"a": 0})
+	if !m.MapIndex(reflect.ValueOf("a")).IsValid() {
+		t.Error("MapIndex of a key with a zero value is not valid")
+	}
+	if m.MapIndex(reflect.ValueOf("b")).IsValid() {
+		t.Error("MapIndex of a missing key is valid")
+	}
+}

@@ -287,8 +287,13 @@ func (v Value) Len() int {
 	}
 }
 
+// MapIndex returns the value at key, or the zero Value if the map has no
+// such key, as the real reflect does.
 func (v Value) MapIndex(key Value) Value {
-	value, _ := getMapInterface(v).GetIndex(key.inner)
+	value, ok := getMapInterface(v).GetIndex(key.inner)
+	if !ok {
+		return Value{}
+	}
 	return wrapValue(value)
 }
 
