@@ -862,3 +862,22 @@ func TestMapMultiAssign(t *testing.T) {
 		t.Errorf("expected 7, got %s", foo)
 	}
 }
+
+// TestMapModifyOutsideList updates map entries in statements that are not in
+// a list of statements: a for loop's post statement and a labeled statement.
+func TestMapModifyOutsideList(t *testing.T) {
+	m := make(map[int]int)
+	for i := 0; i < 3; m[i]++ {
+		i++
+	}
+	for i := 0; i < 2; i++ {
+	again:
+		m[i] += 10
+		if m[i] < 30 {
+			goto again
+		}
+	}
+	if m[0] != 30 || m[1] != 31 || m[2] != 1 || m[3] != 1 || len(m) != 4 {
+		t.Errorf("got %v", m)
+	}
+}
