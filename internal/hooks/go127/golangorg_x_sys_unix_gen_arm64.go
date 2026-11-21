@@ -40,6 +40,14 @@ func GolangOrgXSysUnix_Fallocate(fd int, mode uint32, off int64, len int64) (err
 	return simulation.SyscallSysFallocate(fd, mode, off, len)
 }
 
+func GolangOrgXSysUnix_Fchmod(fd int, mode uint32) (err error) {
+	return simulation.SyscallSysFchmod(fd, mode)
+}
+
+func GolangOrgXSysUnix_fchmodat(dirfd int, path string, mode uint32) (err error) {
+	return simulation.SyscallSysFchmodat(dirfd, path, mode)
+}
+
 func GolangOrgXSysUnix_Fdatasync(fd int) (err error) {
 	return simulation.SyscallSysFdatasync(fd)
 }

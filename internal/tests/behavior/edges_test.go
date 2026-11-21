@@ -286,3 +286,27 @@ func TestSetMapIndexDeletes(t *testing.T) {
 		t.Errorf("got %v", m)
 	}
 }
+
+// TestChmod changes modes, as os.MkdirTemp's callers do; the simulated
+// file system keeps no modes, so only errors are checked.
+func TestChmod(t *testing.T) {
+	setupRealDisk(t)
+	dir, err := os.MkdirTemp(".", "chmod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Create(dir + "/f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := f.Chmod(0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod("missing", 0o700); !os.IsNotExist(err) {
+		t.Errorf("chmod of a missing file: got %v", err)
+	}
+}

@@ -24,6 +24,8 @@
 >   `runtime.fastrandn`, `runtime.fastrand64` and `runtime.mallocgc` with a
 >   `go:linkname`, as Pebble does; gosim gives them hooks. `mallocgc` is
 >   only for memory without pointers, with a nil type.
+> - `chmod` and `fchmod` accept any mode of a file that exists, since the
+>   simulated file system keeps no permissions.
 > - `statfs` and `fstatfs` report a file system of 1 TiB, all of it free;
 >   `fadvise64` accepts any valid advice and ignores it; `fcntl` record
 >   locks, through `syscall` or `golang.org/x/sys/unix`, are always granted,

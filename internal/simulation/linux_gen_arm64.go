@@ -39,6 +39,8 @@ type linuxOSIface interface {
 	SysConnect(s int, addr unsafe.Pointer, addrlen Socklen, invocation *syscallabi.Syscall) (err error)
 	SysFadvise64(fd int, offset int64, length int64, advice int, invocation *syscallabi.Syscall) (err error)
 	SysFallocate(fd int, mode uint32, off int64, len int64, invocation *syscallabi.Syscall) (err error)
+	SysFchmod(fd int, mode uint32, invocation *syscallabi.Syscall) (err error)
+	SysFchmodat(dirfd int, path string, mode uint32, invocation *syscallabi.Syscall) (err error)
 	SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Syscall) (val int, err error)
 	SysFdatasync(fd int, invocation *syscallabi.Syscall) (err error)
 	SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err error)
@@ -429,6 +431,81 @@ func (baseSyscallLogger) LogEntrySysFallocate(fd int, mode uint32, off int64, le
 
 func (baseSyscallLogger) LogExitSysFallocate(fd int, mode uint32, off int64, len int64, syscall *syscallabi.Syscall, err error) {
 	logSyscallExit("SysFallocate", syscall)
+}
+
+//go:norace
+func SyscallSysFchmod(fd int, mode uint32) (err error) {
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSysFchmod
+	syscall.OS = linuxOS
+	syscall.Int0 = uintptr(fd)
+	syscall.Int1 = uintptr(mode)
+	if logSyscalls {
+		syscall.Step = gosimruntime.Step()
+		syscallLogger.LogEntrySysFchmod(fd, mode, syscall)
+	}
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	if logSyscalls {
+		syscallLogger.LogExitSysFchmod(fd, mode, syscall, err)
+	}
+	return
+}
+
+//go:norace
+func trampolineSysFchmod(syscall *syscallabi.Syscall) {
+	fd := int(syscall.Int0)
+	mode := uint32(syscall.Int1)
+	err := syscall.OS.(*LinuxOS).SysFchmod(fd, mode, syscall)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+func (baseSyscallLogger) LogEntrySysFchmod(fd int, mode uint32, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFchmod", syscall)
+}
+
+func (baseSyscallLogger) LogExitSysFchmod(fd int, mode uint32, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFchmod", syscall)
+}
+
+//go:norace
+func SyscallSysFchmodat(dirfd int, path string, mode uint32) (err error) {
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSysFchmodat
+	syscall.OS = linuxOS
+	syscall.Int0 = uintptr(dirfd)
+	syscall.Ptr1 = path
+	syscall.Int2 = uintptr(mode)
+	if logSyscalls {
+		syscall.Step = gosimruntime.Step()
+		syscallLogger.LogEntrySysFchmodat(dirfd, path, mode, syscall)
+	}
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	if logSyscalls {
+		syscallLogger.LogExitSysFchmodat(dirfd, path, mode, syscall, err)
+	}
+	syscall.Ptr1 = nil
+	return
+}
+
+//go:norace
+func trampolineSysFchmodat(syscall *syscallabi.Syscall) {
+	dirfd := int(syscall.Int0)
+	path := syscall.Ptr1.(string)
+	mode := uint32(syscall.Int2)
+	err := syscall.OS.(*LinuxOS).SysFchmodat(dirfd, path, mode, syscall)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+func (baseSyscallLogger) LogEntrySysFchmodat(dirfd int, path string, mode uint32, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFchmodat", syscall)
+}
+
+func (baseSyscallLogger) LogExitSysFchmodat(dirfd int, path string, mode uint32, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFchmodat", syscall)
 }
 
 //go:norace
@@ -1692,6 +1769,10 @@ func IsHandledSyscall(trap uintptr) bool {
 	case unix.SYS_FADVISE64:
 		return true
 	case unix.SYS_FALLOCATE:
+		return true
+	case unix.SYS_FCHMOD:
+		return true
+	case unix.SYS_FCHMODAT:
 		return true
 	case unix.SYS_FCNTL:
 		return true

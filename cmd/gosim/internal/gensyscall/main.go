@@ -195,6 +195,8 @@ var filterCommon = []string{
 	"SYS_CONNECT",
 	"SYS_FADVISE64",
 	"SYS_FALLOCATE",
+	"SYS_FCHMOD",
+	"SYS_FCHMODAT",
 	"SYS_FCNTL",
 	"SYS_FDATASYNC",
 	"SYS_FLOCK",

@@ -2061,3 +2061,37 @@ func noMachineSyscall(s *syscallabi.Syscall) {
 	}
 	s.Errno = uintptr(syscall.ENOSYS)
 }
+
+// SysFchmod accepts any mode for an open file: the simulated file system
+// has no permissions, so a mode changes nothing.
+func (l *LinuxOS) SysFchmod(fd int, mode uint32, invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+	if _, ok := l.files[fd]; !ok {
+		return syscall.EBADF
+	}
+	return nil
+}
+
+// SysFchmodat accepts any mode for a file that exists, as SysFchmod does.
+func (l *LinuxOS) SysFchmodat(dirfd int, path string, mode uint32, invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+	dirInode, err := l.dirInodeForFd(dirfd)
+	if err != nil {
+		return err
+	}
+	if _, err := l.machine.filesystem.Stat(dirInode, path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		return syscall.EINVAL
+	}
+	return nil
+}

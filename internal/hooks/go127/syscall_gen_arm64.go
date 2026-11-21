@@ -36,6 +36,14 @@ func Syscall_Fallocate(fd int, mode uint32, off int64, len int64) (err error) {
 	return simulation.SyscallSysFallocate(fd, mode, off, len)
 }
 
+func Syscall_Fchmod(fd int, mode uint32) (err error) {
+	return simulation.SyscallSysFchmod(fd, mode)
+}
+
+func Syscall_fchmodat(dirfd int, path string, mode uint32) (err error) {
+	return simulation.SyscallSysFchmodat(dirfd, path, mode)
+}
+
 func Syscall_fcntl(fd int, cmd int, arg int) (val int, err error) {
 	return simulation.SyscallSysFcntl(fd, cmd, arg)
 }
