@@ -234,8 +234,8 @@ func (t *packageTranslator) rewriteChanImplicitConversion(c *dstutil.Cursor) {
 		if typ, ok := t.implicitConversions[astExpr]; ok {
 			if _, ok := isTypChanType(typ); ok {
 				c.Replace(&dst.CallExpr{
-					Fun:  t.typeExprAt(typ, astExpr.Pos()),
-					Args: []dst.Expr{expr},
+					Fun:  t.makeTypeExpr(typ),
+					Args: []dst.Expr{t.convertedGlobal(expr)},
 				})
 			}
 		}

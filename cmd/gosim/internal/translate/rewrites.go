@@ -408,3 +408,54 @@ func isStdPackage(pkgPath string) bool {
 	first, _, _ := strings.Cut(pkgPath, "/")
 	return !strings.Contains(first, ".")
 }
+
+// rewriteConstantLen replaces len(x) and cap(x) that are constants, as for
+// an array x, with their value. When x is a package-level variable, gosim
+// moves it into the package's globals, and len of the moved variable is no
+// longer a constant, which an array length needs. Go does not evaluate x
+// in such a call, so nothing is lost.
+func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
+	call, ok := c.Node().(*dst.CallExpr)
+	if !ok || !(t.isNamedBuiltIn(call.Fun, "len") || t.isNamedBuiltIn(call.Fun, "cap")) {
+		return
+	}
+	astCall, ok := t.astMap.Nodes[call].(ast.Expr)
+	if !ok {
+		return
+	}
+	tv, ok := t.typesInfo.Types[astCall]
+	if !ok || tv.Value == nil {
+		return
+	}
+	c.Replace(&dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString(), Decs: dst.BasicLitDecorations{NodeDecs: call.Decs.NodeDecs}})
+}
+
+// rewriteEmbedFS wraps an embed.FS that is converted to an interface of
+// the translated io/fs, such as fs.FS, in the hook EmbedFS. gosim does not
+// translate embed, so embed.FS implements only the native interfaces.
+func (t *packageTranslator) rewriteEmbedFS(c *dstutil.Cursor) {
+	expr, ok := c.Node().(dst.Expr)
+	if !ok {
+		return
+	}
+	astExpr, ok := t.astMap.Nodes[expr].(ast.Expr)
+	if !ok {
+		return
+	}
+	to, ok := t.implicitConversions[astExpr]
+	if !ok || !types.IsInterface(to) || to.Underlying().(*types.Interface).Empty() {
+		return
+	}
+	from, ok := t.getType(expr)
+	if !ok {
+		return
+	}
+	named, ok := from.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != "embed" || named.Obj().Name() != "FS" {
+		return
+	}
+	c.Replace(&dst.CallExpr{
+		Fun:  &dst.Ident{Name: "EmbedFS", Path: translatedHooksPackage},
+		Args: []dst.Expr{t.convertedGlobal(expr)},
+	})
+}

@@ -316,6 +316,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 
 	translator := &packageTranslator{
 		typesInfo:           args.pkg.TypesInfo,
+		pkgTypes:            args.pkg.Types,
 		astMap:              dec.Map.Ast,
 		dstMap:              dec.Map.Dst,
 		replacedPkgs:        localReplacedPkgs,
@@ -427,6 +428,29 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		}
 	}
 
+	// The aliases that unshadow made, in a file of the package.
+	if len(translator.localAliases) > 0 {
+		var specs []dst.Spec
+		for _, name := range slices.Sorted(maps.Keys(translator.localAliases)) {
+			specs = append(specs, &dst.TypeSpec{Name: dst.NewIdent(name), Assign: true, Type: translator.localAliases[name]})
+		}
+		file := &dst.File{
+			Name:  dst.NewIdent(args.pkg.Name),
+			Decls: []dst.Decl{&dst.GenDecl{Tok: token.TYPE, Specs: specs}},
+		}
+		bytes, err := dstFileToBytes(file, args.packageNames, nil, "main")
+		if err != nil {
+			log.Fatal(err)
+		}
+		name := "gosimalias.go"
+		if forTest || strings.HasSuffix(args.pkg.PkgPath, "_test") {
+			name = "gosimalias_test.go"
+		}
+		if err := writer.stage(pathForFile(outputPackage, name), bytes); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// write a gosimaliashack.go file if needed
 	if kind == PackageKindBase {
 		// XXX: compute these automatically?
@@ -499,6 +523,16 @@ type packageTranslator struct {
 	forTest bool
 
 	testFuncs map[string]bool
+
+	// pkgTypes is the package, and curPos the position of the node being
+	// translated, for unshadow.
+	pkgTypes *types.Package
+	curPos   token.Pos
+	// localAliases are package-level aliases of types of other packages,
+	// by name, that unshadow made.
+	localAliases map[string]*dst.Ident
+	// convertedGlobals are reads of globals inside implicit conversions.
+	convertedGlobals map[dst.Node]bool
 }
 
 func (t *packageTranslator) isBuiltIn(expr dst.Expr) bool {
@@ -584,6 +618,9 @@ func (t *packageTranslator) apply(node dst.Node) dst.Node {
 }
 
 func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
+	if n, ok := t.astMap.Nodes[c.Node()]; ok && n != nil && n.Pos().IsValid() {
+		t.curPos = n.Pos()
+	}
 	if f, ok := c.Node().(*dst.File); ok {
 		for i, dec := range f.Decs.Start {
 			if strings.HasPrefix(dec, "//go:build") {
@@ -601,6 +638,8 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteNotifyListHack(c)
 	t.rewriteJsonGlobalsHack(c)
 	t.rewriteBigIntRand(c)
+	t.rewriteConstantLen(c)
+	t.rewriteEmbedFS(c)
 
 	// TODO: think about and make this ordering less brittle
 

@@ -100,7 +100,10 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 			id.Name = "GosimPublicExportHack" + id.Name
 		}
 
-		res := dst.Expr(id)
+		var res dst.Expr = id
+		if typ.TypeArgs() == nil {
+			res = t.unshadow(typ.Obj(), id)
+		}
 		if typ.TypeArgs() != nil {
 			var args []dst.Expr
 			for i := 0; i < typ.TypeArgs().Len(); i++ {
@@ -513,26 +516,37 @@ func (b *implicitConversionsBuilder) after(c *astutil.Cursor) bool {
 	return true
 }
 
-// typeExprAt is makeTypeExpr for an expression at pos. A type of this
-// package whose name a local declaration hides at pos, such as a parameter
-// of the same name, is named through its export alias.
-func (t *packageTranslator) typeExprAt(typ types.Type, pos token.Pos) dst.Expr {
-	expr := t.makeTypeExpr(typ)
-	named, ok := typ.(*types.Named)
-	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != t.pkgPath {
-		return expr
+// unshadow returns the identifier id of the type obj, or the name of an
+// alias of it where a local declaration hides the name that id uses at the
+// node being translated: a parameter named like the type's package, as in
+// func f(types map[string]*types.T), or like the type itself. The alias
+// is declared at the package level, where nothing hides the name. Using
+// the alias where nothing hides the name is harmless.
+func (t *packageTranslator) unshadow(obj *types.TypeName, id *dst.Ident) dst.Expr {
+	if t.curPos == token.NoPos || t.pkgTypes == nil || obj.Pkg() == nil {
+		return id
 	}
-	id, ok := expr.(*dst.Ident)
-	if !ok || id.Path != "" {
-		return expr
-	}
-	scope := named.Obj().Pkg().Scope().Innermost(pos)
+	scope := t.pkgTypes.Scope().Innermost(t.curPos)
 	if scope == nil {
-		return expr
+		return id
 	}
-	if _, obj := scope.LookupParent(id.Name, pos); obj != named.Obj() {
-		test := t.forTest || strings.HasSuffix(t.pkgPath, "_test")
-		id.Name = t.addExportHack(t.pkgPath, id.Name, test)
+	test := t.forTest || strings.HasSuffix(t.pkgPath, "_test")
+	// A name that nothing declares at the node, as when the node is in
+	// another file than the one being written, is not hidden either.
+	if obj.Pkg() == t.pkgTypes {
+		if _, found := scope.LookupParent(obj.Name(), t.curPos); found != nil && found != obj {
+			return dst.NewIdent(t.addExportHack(t.pkgPath, id.Name, test))
+		}
+		return id
 	}
-	return expr
+	_, found := scope.LookupParent(obj.Pkg().Name(), t.curPos)
+	if _, isPkg := found.(*types.PkgName); isPkg || found == nil {
+		return id
+	}
+	alias := "GosimAlias_" + obj.Pkg().Name() + "_" + id.Name
+	if t.localAliases == nil {
+		t.localAliases = make(map[string]*dst.Ident)
+	}
+	t.localAliases[alias] = &dst.Ident{Name: id.Name, Path: id.Path}
+	return dst.NewIdent(alias)
 }

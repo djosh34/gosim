@@ -1,8 +1,13 @@
 package behavior_test
 
 import (
+	"embed"
+	"errors"
+	"io/fs"
 	"math/big"
 	"math/rand"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -72,4 +77,92 @@ func TestGoPrintln(t *testing.T) {
 	go println("from a goroutine")
 	go func() { close(done) }()
 	<-done
+}
+
+var builders map[string]*strings.Builder
+
+// setBuilders's parameter hides the package strings in the body, where the
+// translated nil names *strings.Builder.
+func setBuilders(strings map[string]*strings.Builder) func() {
+	builders = strings
+	return func() { builders = nil }
+}
+
+func TestShadowedPackage(t *testing.T) {
+	reset := setBuilders(map[string]*strings.Builder{"a": {}})
+	if len(builders) != 1 {
+		t.Errorf("got %v", builders)
+	}
+	reset()
+	if builders != nil {
+		t.Errorf("got %v after the reset", builders)
+	}
+}
+
+// chanSet is a set of channels, as in a struct field of CockroachDB.
+type chanSet struct {
+	mu struct {
+		chans map[chan<- struct{}]struct{}
+	}
+}
+
+func TestMapOfChannels(t *testing.T) {
+	var s chanSet
+	s.mu.chans = make(map[chan<- struct{}]struct{})
+	ch := make(chan struct{}, 1)
+	s.mu.chans[ch] = struct{}{}
+	for c := range s.mu.chans {
+		select {
+		case c <- struct{}{}:
+		default:
+			t.Error("the channel is full")
+		}
+	}
+	delete(s.mu.chans, ch)
+	if len(s.mu.chans) != 0 || len(ch) != 1 {
+		t.Errorf("got %d channels, %d in the channel", len(s.mu.chans), len(ch))
+	}
+}
+
+type optMap map[string]int
+
+func takesOpt(m optMap) int { return len(m) }
+
+var globalOpts = map[string]int{"a": 1, "b": 2}
+
+func TestGlobalMapConversion(t *testing.T) {
+	if n := takesOpt(globalOpts); n != 2 {
+		t.Errorf("got %d", n)
+	}
+}
+
+//go:embed testdata/embed.txt
+var embedded embed.FS
+
+// TestEmbedFSAsFS passes an embed.FS where an fs.FS is expected.
+func TestEmbedFSAsFS(t *testing.T) {
+	data, err := fs.ReadFile(embedded, "testdata/embed.txt")
+	if err != nil || len(data) == 0 {
+		t.Fatalf("got %q, %v", data, err)
+	}
+	var names []string
+	if err := fs.WalkDir(embedded, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		names = append(names, p)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{".", "testdata", "testdata/embed.txt"}; !slices.Equal(names, want) {
+		t.Errorf("got %q, want %q", names, want)
+	}
+	info, err := fs.Stat(embedded, "testdata/embed.txt")
+	if err != nil || info.Size() != int64(len(data)) || info.IsDir() {
+		t.Errorf("got %v, %v", info, err)
+	}
+	if _, err := fs.Stat(embedded, "missing"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a missing file: got %v", err)
+	}
 }

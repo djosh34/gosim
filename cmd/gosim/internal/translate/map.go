@@ -280,8 +280,8 @@ func (t *packageTranslator) rewriteMapImplicitConversion(c *dstutil.Cursor) {
 		if typ, ok := t.implicitConversions[astExpr]; ok {
 			if _, ok := isTypMapType(typ); ok {
 				c.Replace(&dst.CallExpr{
-					Fun:  t.typeExprAt(typ, astExpr.Pos()),
-					Args: []dst.Expr{expr},
+					Fun:  t.makeTypeExpr(typ),
+					Args: []dst.Expr{t.convertedGlobal(expr)},
 				})
 			}
 		}
@@ -306,7 +306,9 @@ func (t *packageTranslator) rewriteMapType(c *dstutil.Cursor) {
 		c.Replace(&dst.IndexListExpr{
 			X: t.newRuntimeSelector("Map"),
 			Indices: []dst.Expr{
-				mapType.Key,
+				// A key may hold a type that translates too, such as
+				// a channel.
+				t.apply(mapType.Key).(dst.Expr),
 				t.apply(mapType.Value).(dst.Expr),
 			},
 		})
@@ -319,7 +321,7 @@ func (t *packageTranslator) rewriteMapType(c *dstutil.Cursor) {
 			c.Replace(&dst.IndexListExpr{
 				X: t.newRuntimeSelector("MapConstraint"),
 				Indices: []dst.Expr{
-					mapType.Key,
+					t.apply(mapType.Key).(dst.Expr),
 					t.apply(mapType.Value).(dst.Expr),
 				},
 			})
