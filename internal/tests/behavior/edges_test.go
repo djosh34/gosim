@@ -1,6 +1,8 @@
 package behavior_test
 
 import (
+	"bytes"
+	cryptorand "crypto/rand"
 	"embed"
 	"errors"
 	"io/fs"
@@ -201,5 +203,23 @@ func mustStat(f *os.File) os.FileMode {
 func TestInitializerStatsStdout(t *testing.T) {
 	if gosim.IsSim() && stdoutMode&os.ModeCharDevice == 0 {
 		t.Errorf("os.Stdout has mode %v", stdoutMode)
+	}
+}
+
+// randomKey is made by an initializer from crypto/rand, which gosim also
+// runs outside any machine.
+var randomKey = mustRandom()
+
+func mustRandom() []byte {
+	b := make([]byte, 32)
+	if _, err := cryptorand.Read(b); err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func TestInitializerReadsRandom(t *testing.T) {
+	if bytes.Equal(randomKey, make([]byte, 32)) {
+		t.Error("the key is all zeros")
 	}
 }

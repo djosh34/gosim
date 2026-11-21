@@ -1985,10 +1985,23 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 // the globals that machines share: the other globals it computes there are
 // thrown away, but a panic is not. cockroachdb/ttycolor panics when it
 // cannot stat os.Stdout, so fstat of the standard files reports a terminal,
-// as on a machine (SysFstat). Every other call fails with ENOSYS.
+// as on a machine (SysFstat). Initializers that make keys read random
+// bytes, which come from the run's random stream, as on a machine
+// (SysGetrandom). Every other call fails with ENOSYS.
 //
 //go:norace
 func noMachineSyscall(s *syscallabi.Syscall) {
+	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysGetrandom).Pointer() {
+		buf := unsafe.Slice(s.Ptr0.(*byte), int(s.Int0))
+		for i := 0; i < len(buf); i += 8 {
+			var word [8]byte
+			binary.LittleEndian.PutUint64(word[:], gosimruntime.Fastrand64())
+			copy(buf[i:], word[:])
+		}
+		s.R0 = uintptr(len(buf))
+		s.Errno = 0
+		return
+	}
 	if reflect.ValueOf(s.Trampoline).Pointer() == reflect.ValueOf(trampolineSysFstat).Pointer() {
 		if fd := int(s.Int0); fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr {
 			stat := s.Ptr1.(*Stat_t)
