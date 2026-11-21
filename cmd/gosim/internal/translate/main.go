@@ -10,6 +10,7 @@ import (
 	"path"
 	"runtime/pprof"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -512,7 +513,12 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 
 	translateToolHash := computeTranslateToolHash(cfg)
 
+	// GOSIM_TRANSLATE_WORKERS sets how many packages translate at once;
+	// each holds its syntax trees, so fewer use less memory.
 	numWorkers := 32
+	if n, err := strconv.Atoi(os.Getenv("GOSIM_TRANSLATE_WORKERS")); err == nil && n > 0 {
+		numWorkers = n
+	}
 
 	packageHashes := make(map[string]Hash)
 

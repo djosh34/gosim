@@ -68,6 +68,8 @@
 >   lines without a space. A package outside the standard library that
 >   links into `reflect` gets unimplemented hooks for those functions, and
 >   `github.com/petermattis/goid.Get` gets a hook.
+> - `GOSIM_TRANSLATE_WORKERS` sets how many packages translate at once
+>   (32 by default); fewer use less memory on a large tree.
 > - `metatesting.ForTestBinary` runs a test binary that `gosim build-tests`
 >   built, from any path, without checking that it is newer than its
 >   sources: a binary built once can be copied to the machines that run it.
