@@ -352,3 +352,46 @@ func (t *packageTranslator) rewriteNotifyListHack(c *dstutil.Cursor) {
 		}
 	}
 }
+
+// rewriteBigIntRand rewrites z.Rand(rnd, n) on a *big.Int into a call of
+// the hook BigIntRand. math/big is not translated, and its Rand takes the
+// native *rand.Rand, where translated code has the translated one.
+func (t *packageTranslator) rewriteBigIntRand(c *dstutil.Cursor) {
+	call, ok := c.Node().(*dst.CallExpr)
+	if !ok {
+		return
+	}
+	sel, ok := call.Fun.(*dst.SelectorExpr)
+	if !ok {
+		return
+	}
+	astSel, ok := t.astMap.Nodes[sel].(*ast.SelectorExpr)
+	if !ok {
+		return
+	}
+	selection, ok := t.typesInfo.Selections[astSel]
+	if !ok || selection.Kind() != types.MethodVal {
+		return
+	}
+	fn := selection.Obj()
+	if fn.Pkg() == nil || fn.Pkg().Path() != "math/big" || fn.Name() != "Rand" {
+		return
+	}
+	if recv := fn.Type().(*types.Signature).Recv(); recv == nil || recv.Type().String() != "*math/big.Int" {
+		return
+	}
+	z := t.apply(sel.X).(dst.Expr)
+	if typ, ok := t.getType(sel.X); ok {
+		if _, isPtr := typ.Underlying().(*types.Pointer); !isPtr {
+			z = &dst.UnaryExpr{Op: token.AND, X: z}
+		}
+	}
+	args := []dst.Expr{z}
+	for _, arg := range call.Args {
+		args = append(args, t.apply(arg).(dst.Expr))
+	}
+	c.Replace(&dst.CallExpr{
+		Fun:  &dst.Ident{Name: "BigIntRand", Path: translatedHooksPackage},
+		Args: args,
+	})
+}

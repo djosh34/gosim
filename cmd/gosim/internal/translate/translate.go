@@ -413,18 +413,15 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 	for _, pkgPath := range slices.Sorted(maps.Keys(translator.exportHacks)) {
 		outPkg, ok := args.replacedPkgs[pkgPath]
 		if !ok {
-			log.Fatalf("need public export hack for %s.%s, in a package gosim does not translate", pkgPath, translator.exportHacks[pkgPath][0])
+			log.Fatalf("need public export hack for %s.%s, in a package gosim does not translate", pkgPath, translator.exportHacks[pkgPath][0].name)
 		}
-		for _, name := range translator.exportHacks[pkgPath] {
-			file, err := makePublicExportHackFile(args.packageNames[pkgPath], []string{name})
-			if err != nil {
-				log.Fatal(err)
-			}
+		for _, hack := range translator.exportHacks[pkgPath] {
+			file := makeExportAliasFile(args.packageNames[pkgPath], hack)
 			bytes, err := dstFileToBytes(file, args.packageNames, nil, "main")
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := writer.stage(pathForFile(outPkg, "gosimexport_"+name+".go"), bytes); err != nil {
+			if err := writer.stage(pathForFile(outPkg, hack.fileName()), bytes); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -492,10 +489,12 @@ type packageTranslator struct {
 
 	unimplemented []gosimtool.UnimplementedHook
 
-	// exportHacks are the unexported types of other packages, by package
-	// path, that this package names and PublicExportHacks does not list.
-	// Each gets an exported alias in its own package.
-	exportHacks map[string][]string
+	// exportHacks are the types, by package path, that this package names
+	// through an alias: unexported types of other packages that
+	// PublicExportHacks does not list, and types of this package whose name
+	// is hidden where it is used (typeExprAt). Each gets the alias in its
+	// own package.
+	exportHacks map[string][]exportHack
 
 	forTest bool
 
@@ -545,6 +544,19 @@ func (t *packageTranslator) getType(expr dst.Expr) (types.Type, bool) {
 	return nil, false
 }
 
+// asInt translates the size argument of make, converted to int where it
+// has another integer type: gosim's NewChan and NewMapSized take an int.
+func (t *packageTranslator) asInt(size dst.Expr) dst.Expr {
+	typ, ok := t.getType(size)
+	out := t.apply(size).(dst.Expr)
+	if ok {
+		if basic, isBasic := typ.Underlying().(*types.Basic); isBasic && (basic.Kind() == types.Int || basic.Info()&types.IsUntyped != 0) && typ == typ.Underlying() {
+			return out
+		}
+	}
+	return &dst.CallExpr{Fun: dst.NewIdent("int"), Args: []dst.Expr{out}}
+}
+
 func (t *packageTranslator) markSyncFuncsNorace(c *dstutil.Cursor) {
 	node := c.Node()
 
@@ -588,6 +600,7 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteImport(c)
 	t.rewriteNotifyListHack(c)
 	t.rewriteJsonGlobalsHack(c)
+	t.rewriteBigIntRand(c)
 
 	// TODO: think about and make this ordering less brittle
 
@@ -795,15 +808,50 @@ func symbolName(pkg string, fn *dst.FuncDecl) string {
 	return b.String()
 }
 
-// addExportHack records that the package names the unexported type name
-// of the package pkgPath.
-func (t *packageTranslator) addExportHack(pkgPath, name string) {
+// exportHack is an exported alias of a type, in the type's package.
+type exportHack struct {
+	name string
+	// test is set for an alias that a test package uses for its own type:
+	// it goes in a _test.go file and has a name of its own, so that it
+	// cannot clash with the alias of the base package.
+	test bool
+}
+
+func (h exportHack) alias() string {
+	if h.test {
+		return "GosimTestExportHack" + h.name
+	}
+	return "GosimPublicExportHack" + h.name
+}
+
+func (h exportHack) fileName() string {
+	if h.test {
+		return "gosimexport_" + h.name + "_test.go"
+	}
+	return "gosimexport_" + h.name + ".go"
+}
+
+func makeExportAliasFile(pkgName string, h exportHack) *dst.File {
+	return &dst.File{
+		Name: dst.NewIdent(pkgName),
+		Decls: []dst.Decl{&dst.GenDecl{
+			Tok:   token.TYPE,
+			Specs: []dst.Spec{&dst.TypeSpec{Name: dst.NewIdent(h.alias()), Assign: true, Type: dst.NewIdent(h.name)}},
+		}},
+	}
+}
+
+// addExportHack records that the package names the type name of the
+// package pkgPath through an alias, and returns the alias's name.
+func (t *packageTranslator) addExportHack(pkgPath, name string, test bool) string {
 	if t.exportHacks == nil {
-		t.exportHacks = make(map[string][]string)
+		t.exportHacks = make(map[string][]exportHack)
 	}
-	if !slices.Contains(t.exportHacks[pkgPath], name) {
-		t.exportHacks[pkgPath] = append(t.exportHacks[pkgPath], name)
+	h := exportHack{name: name, test: test}
+	if !slices.Contains(t.exportHacks[pkgPath], h) {
+		t.exportHacks[pkgPath] = append(t.exportHacks[pkgPath], h)
 	}
+	return h.alias()
 }
 
 func makePublicExportHackFile(pkgName string, names []string) (*dst.File, error) {

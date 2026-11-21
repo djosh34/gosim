@@ -251,6 +251,14 @@ func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*
 			// translates, hold this initializer.
 			continue
 		}
+		if len(initializer.Lhs) == 1 && initializer.Lhs[0].Name() == "_" {
+			if id, ok := initializer.Rhs.(*ast.Ident); ok && id.Name == "nil" && t.typesInfo.Uses[id] == types.Universe.Lookup("nil") {
+				// var _ T = nil checks only that nil is a T; "_ = nil" does
+				// not compile, and nil has no effects to keep.
+				continue
+			}
+		}
+
 		var lhs []dst.Expr
 
 		shouldShare := t.globalInfo.ByPackage[t.pkgPath].ShouldShare[initializer.Lhs[0].Name()]

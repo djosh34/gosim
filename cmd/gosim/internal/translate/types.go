@@ -8,6 +8,7 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/dave/dst"
 	"golang.org/x/tools/go/ast/astutil"
@@ -55,7 +56,7 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
 			if slices.Index(PublicExportHacks[path], id.Name) == -1 {
-				t.addExportHack(path, id.Name)
+				t.addExportHack(path, id.Name, false)
 			}
 			id.Name = "GosimPublicExportHack" + id.Name
 		}
@@ -94,7 +95,7 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
 			if slices.Index(PublicExportHacks[path], id.Name) == -1 {
-				t.addExportHack(path, id.Name)
+				t.addExportHack(path, id.Name, false)
 			}
 			id.Name = "GosimPublicExportHack" + id.Name
 		}
@@ -510,4 +511,28 @@ func (b *implicitConversionsBuilder) after(c *astutil.Cursor) bool {
 		b.cursig = b.sigstack[len(b.sigstack)-1]
 	}
 	return true
+}
+
+// typeExprAt is makeTypeExpr for an expression at pos. A type of this
+// package whose name a local declaration hides at pos, such as a parameter
+// of the same name, is named through its export alias.
+func (t *packageTranslator) typeExprAt(typ types.Type, pos token.Pos) dst.Expr {
+	expr := t.makeTypeExpr(typ)
+	named, ok := typ.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != t.pkgPath {
+		return expr
+	}
+	id, ok := expr.(*dst.Ident)
+	if !ok || id.Path != "" {
+		return expr
+	}
+	scope := named.Obj().Pkg().Scope().Innermost(pos)
+	if scope == nil {
+		return expr
+	}
+	if _, obj := scope.LookupParent(id.Name, pos); obj != named.Obj() {
+		test := t.forTest || strings.HasSuffix(t.pkgPath, "_test")
+		id.Name = t.addExportHack(t.pkgPath, id.Name, test)
+	}
+	return expr
 }

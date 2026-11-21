@@ -234,7 +234,7 @@ func (t *packageTranslator) rewriteChanImplicitConversion(c *dstutil.Cursor) {
 		if typ, ok := t.implicitConversions[astExpr]; ok {
 			if _, ok := isTypChanType(typ); ok {
 				c.Replace(&dst.CallExpr{
-					Fun:  t.makeTypeExpr(typ),
+					Fun:  t.typeExprAt(typ, astExpr.Pos()),
 					Args: []dst.Expr{expr},
 				})
 			}
@@ -248,7 +248,7 @@ func (t *packageTranslator) rewriteMakeChan(c *dstutil.Cursor) {
 		if typ, ok := t.isChanType(makeExpr); ok {
 			var lenArg dst.Expr = &dst.BasicLit{Kind: token.INT, Value: "0"}
 			if len(makeExpr.Args) >= 2 {
-				lenArg = t.apply(makeExpr.Args[1]).(dst.Expr)
+				lenArg = t.asInt(makeExpr.Args[1])
 			}
 
 			c.Replace(t.maybeConvertChanType(&dst.CallExpr{
