@@ -537,8 +537,12 @@ type packageTranslator struct {
 	convertedGlobals map[dst.Node]bool
 }
 
+// isBuiltIn reports whether expr names a builtin function. An expr that
+// the translation made, such as rewriteConstantLen's len, has no source
+// node and counts as no builtin.
 func (t *packageTranslator) isBuiltIn(expr dst.Expr) bool {
-	return t.typesInfo.Types[t.astMap.Nodes[expr].(ast.Expr)].IsBuiltin()
+	astExpr, ok := t.astMap.Nodes[expr].(ast.Expr)
+	return ok && t.typesInfo.Types[astExpr].IsBuiltin()
 }
 
 func (t *packageTranslator) isNamedBuiltIn(expr dst.Expr, name string) bool {

@@ -162,8 +162,7 @@ var globals gosimruntime.Global[Globals]
 
 func initializers(initializeShared bool) {
 	GosimGlobals().globalOpts = gosimruntime.MapLiteral([]gosimruntime.KV[string, int]{{K: "a", V: 1}})
-	GosimGlobals().half = len([5]struct {
-	}{}) / 2.0
+	GosimGlobals().half = len([5]struct{}{}) / 2.0
 }
 func GosimGlobals() *Globals { return globals.Get() }
 func init() {

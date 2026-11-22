@@ -442,7 +442,7 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 		Args: []dst.Expr{&dst.CompositeLit{
 			Type: &dst.ArrayType{
 				Len: &dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString()},
-				Elt: &dst.StructType{Fields: &dst.FieldList{}},
+				Elt: &dst.StructType{Fields: &dst.FieldList{Opening: true, Closing: true}},
 			},
 		}},
 		Decs: dst.CallExprDecorations{NodeDecs: call.Decs.NodeDecs},

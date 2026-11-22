@@ -510,3 +510,23 @@ func TestDupMinimum(t *testing.T) {
 		}
 	}
 }
+
+var lenSource = [3]int{1, 2, 3}
+
+// lenSized is a global whose array type takes len of another global.
+var lenSized [len(lenSource)]int
+
+// lenSizedMap holds an array type sized by len of a global, in a map.
+var lenSizedMap = map[string][len(lenSource)]int{"a": {1, 2, 3}}
+
+const lenConst = len(lenSource) * 2
+
+func TestGlobalSizedByLen(t *testing.T) {
+	if got := []int{len(lenSized), len(lenSizedMap["a"]), lenConst}; !slices.Equal(got, []int{3, 3, 6}) {
+		t.Errorf("got %v", got)
+	}
+	var local [len(lenSource)]byte
+	if cap(local) != 3 {
+		t.Errorf("got %d", cap(local))
+	}
+}
