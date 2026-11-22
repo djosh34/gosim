@@ -513,8 +513,8 @@ type packageTranslator struct {
 
 	needsUnsafe bool
 	// foldedImports are the packages that rewriteConstantLen removed a
-	// reference to, by path; each gets a blank import, so that its
-	// initializers still run if that was its last reference.
+	// reference to, by path; each that the file no longer names gets a
+	// blank import, so that its initializers still run.
 	foldedImports map[string]bool
 
 	unimplemented []gosimtool.UnimplementedHook
@@ -753,11 +753,23 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 	if t.needsUnsafe {
 		addBlankImport(dstFile, "unsafe")
 	}
-	for _, path := range slices.Sorted(maps.Keys(t.foldedImports)) {
-		if replaced, ok := t.replacedPkgs[path]; ok {
-			path = replaced
+	if len(t.foldedImports) > 0 {
+		// A package that the file still names keeps its import as it is.
+		named := make(map[string]bool)
+		dst.Inspect(dstFile, func(n dst.Node) bool {
+			if id, ok := n.(*dst.Ident); ok && id.Path != "" {
+				named[id.Path] = true
+			}
+			return true
+		})
+		for _, path := range slices.Sorted(maps.Keys(t.foldedImports)) {
+			if replaced, ok := t.replacedPkgs[path]; ok {
+				path = replaced
+			}
+			if !named[path] {
+				addBlankImport(dstFile, path)
+			}
 		}
-		addBlankImport(dstFile, path)
 	}
 
 	return dstFile, nil

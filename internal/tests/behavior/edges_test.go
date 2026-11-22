@@ -564,9 +564,11 @@ func TestDupMinimum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
-	if f.Fd() >= 1<<20 {
-		t.Errorf("an open got descriptor %d", f.Fd())
+	if fd := f.Fd(); fd >= 1<<20 {
+		t.Errorf("an open got descriptor %d", fd)
+	}
+	if err := f.Close(); err != nil {
+		t.Error(err)
 	}
 }
 

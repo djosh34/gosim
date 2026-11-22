@@ -418,8 +418,8 @@ func isStdPackage(pkgPath string) bool {
 // evaluated, and could panic, and an array length or a const declaration
 // would not compile.
 //
-// A package that x names gets a blank import (foldedImports), which keeps
-// its initializers running if x held its last reference.
+// A package that x names, and the file names nowhere else, gets a blank
+// import (foldedImports), which keeps its initializers running.
 //
 // The constant is len([N]struct{}{}), with the call's own builtin, len or
 // cap, which resolves to the builtin here and names nothing a local could
@@ -442,15 +442,30 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	if !becomesCall {
 		return
 	}
-	// The packages the operand names may have no other reference left.
+	// The packages the operand names, as pkg.Name or through a dot
+	// import, may have no other reference left.
 	ast.Inspect(astCall.Args[0], func(n ast.Node) bool {
-		if id, ok := n.(*ast.Ident); ok {
-			if pkg, ok := t.typesInfo.Uses[id].(*types.PkgName); ok {
-				if t.foldedImports == nil {
-					t.foldedImports = make(map[string]bool)
-				}
-				t.foldedImports[pkg.Imported().Path()] = true
+		id, ok := n.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		var path string
+		switch obj := t.typesInfo.Uses[id].(type) {
+		case *types.PkgName:
+			path = obj.Imported().Path()
+		case nil:
+		default:
+			// A name of another package without its qualifier: a dot
+			// import.
+			if pkg := obj.Pkg(); pkg != nil && pkg != t.pkgTypes && obj.Parent() == pkg.Scope() {
+				path = pkg.Path()
 			}
+		}
+		if path != "" {
+			if t.foldedImports == nil {
+				t.foldedImports = make(map[string]bool)
+			}
+			t.foldedImports[path] = true
 		}
 		return true
 	})
