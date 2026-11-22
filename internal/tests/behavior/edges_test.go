@@ -584,10 +584,17 @@ const (
 	lenNilMap     = len([1]map[int]int{nil})
 	lenNilChan    = len([1]chan int{nil})
 	lenNilMapConv = len([1]map[int]int{map[int]int(nil)})
+	lenNilField   = len([1]struct{ m map[int]int }{{m: nil}})
 )
 
+// lenFuncLitLocal takes len of an array of a function literal, with a
+// variable of its own, and a global.
+func lenFuncLitLocal() int {
+	return len([2]any{func() { x := 1; _ = x }, lenSource[0]})
+}
+
 func TestConstantLenOperands(t *testing.T) {
-	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen(), lenNilMap, lenNilChan, lenNilMapConv}; !slices.Equal(got, []int{2, 2, 45, 1, 1, 1}) {
+	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen(), lenNilMap, lenNilChan, lenNilMapConv, lenNilField, lenFuncLitLocal()}; !slices.Equal(got, []int{2, 2, 45, 1, 1, 1, 1, 2}) {
 		t.Errorf("got %v", got)
 	}
 }

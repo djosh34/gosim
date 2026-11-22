@@ -473,10 +473,10 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 
 // lenOperand reports whether translation makes expr non-constant, as
 // rewriteConstantLen describes, and the local variables that expr uses,
-// each once, in order. gosim translates every value of a map or channel
-// type, a nil one too, into a call; an element of such a type in a
-// composite literal may be an untyped nil, so the literal's element type
-// counts as well.
+// each once, in order, but not those declared in expr. gosim translates
+// every value of a map or channel type, a nil one too, into a call; an
+// element of such a type in a composite literal may be an untyped nil, so
+// the literal's element type and any nil count as well.
 func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall bool, locals []string) {
 	isMapOrChan := func(typ types.Type) bool {
 		if typ == nil {
@@ -498,10 +498,21 @@ func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall bool, locals 
 		}
 		switch e := e.(type) {
 		case *ast.Ident:
-			if v, ok := t.typesInfo.Uses[e].(*types.Var); ok && !v.IsField() && v.Pkg() != nil {
-				if v.Parent() == v.Pkg().Scope() {
+			switch obj := t.typesInfo.Uses[e].(type) {
+			case *types.Nil:
+				// nil may be a map or channel, such as a struct field's,
+				// whose type no expression here has; folding where it is
+				// not one is harmless.
+				becomesCall = true
+			case *types.Var:
+				inside := obj.Pos() >= expr.Pos() && obj.Pos() < expr.End()
+				switch {
+				case obj.IsField() || obj.Pkg() == nil || inside:
+					// A field, or a variable declared in expr, as in a
+					// function literal, which needs no use outside it.
+				case obj.Parent() == obj.Pkg().Scope():
 					becomesCall = true
-				} else if !slices.Contains(locals, e.Name) {
+				case !slices.Contains(locals, e.Name):
 					locals = append(locals, e.Name)
 				}
 			}
