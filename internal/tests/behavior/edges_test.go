@@ -354,3 +354,12 @@ func TestReadDirFile(t *testing.T) {
 		t.Errorf("lstat: got %v, %v", info, err)
 	}
 }
+
+// TestNilChanLen takes len and cap of a nil channel, as the AWS SDK's S3
+// upload manager does.
+func TestNilChanLen(t *testing.T) {
+	var ch chan int
+	if len(ch) != 0 || cap(ch) != 0 {
+		t.Errorf("len %d, cap %d", len(ch), cap(ch))
+	}
+}

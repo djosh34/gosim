@@ -373,15 +373,25 @@ func (c Chan[V]) Recv() V {
 	return v
 }
 
+// Len is len of the channel: 0 for a nil channel, as in Go.
+//
 //go:norace
 func (c Chan[V]) Len() int {
 	getg().yield()
 
+	if c.impl == nil {
+		return 0
+	}
 	return c.impl.len
 }
 
+// Cap is cap of the channel: 0 for a nil channel, as in Go.
+//
 //go:norace
 func (c Chan[V]) Cap() int {
+	if c.impl == nil {
+		return 0
+	}
 	return len(c.impl.buf)
 }
 
