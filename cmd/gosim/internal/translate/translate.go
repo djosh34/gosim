@@ -3,6 +3,7 @@ package translate
 import (
 	"fmt"
 	"go/ast"
+	"go/build/constraint"
 	"go/token"
 	"go/types"
 	"log"
@@ -313,9 +314,11 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 
 	hooks := maps.Clone(hooksGo127)
 	maps.Copy(hooks, hooksGensyscallGo127ByArch[args.cfg.GOARCH])
+	maps.Copy(hooks, thirdPartyHooksGo127)
 
 	translator := &packageTranslator{
 		typesInfo:           args.pkg.TypesInfo,
+		pkgTypes:            args.pkg.Types,
 		astMap:              dec.Map.Ast,
 		dstMap:              dec.Map.Dst,
 		replacedPkgs:        localReplacedPkgs,
@@ -407,6 +410,49 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		}
 	}
 
+	// Give the unexported types of other packages that this package names
+	// an exported alias there, one file each, so that every package that
+	// names a type writes the same file.
+	for _, pkgPath := range slices.Sorted(maps.Keys(translator.exportHacks)) {
+		outPkg, ok := args.replacedPkgs[pkgPath]
+		if !ok {
+			log.Fatalf("need public export hack for %s.%s, in a package gosim does not translate", pkgPath, translator.exportHacks[pkgPath][0].name)
+		}
+		for _, hack := range translator.exportHacks[pkgPath] {
+			file := makeExportAliasFile(args.packageNames[pkgPath], hack)
+			bytes, err := dstFileToBytes(file, args.packageNames, nil, "main")
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := writer.stage(pathForFile(outPkg, hack.fileName()), bytes); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+
+	// The aliases that unshadow made, in a file of the package.
+	if len(translator.localAliases) > 0 {
+		var specs []dst.Spec
+		for _, name := range slices.Sorted(maps.Keys(translator.localAliases)) {
+			specs = append(specs, &dst.TypeSpec{Name: dst.NewIdent(name), Assign: true, Type: translator.localAliases[name]})
+		}
+		file := &dst.File{
+			Name:  dst.NewIdent(args.pkg.Name),
+			Decls: []dst.Decl{&dst.GenDecl{Tok: token.TYPE, Specs: specs}},
+		}
+		bytes, err := dstFileToBytes(file, args.packageNames, nil, "main")
+		if err != nil {
+			log.Fatal(err)
+		}
+		name := "gosimalias.go"
+		if forTest || strings.HasSuffix(args.pkg.PkgPath, "_test") {
+			name = "gosimalias_test.go"
+		}
+		if err := writer.stage(pathForFile(outputPackage, name), bytes); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// write a gosimaliashack.go file if needed
 	if kind == PackageKindBase {
 		// XXX: compute these automatically?
@@ -466,16 +512,41 @@ type packageTranslator struct {
 	globalInfo *GlobalInfo
 
 	needsUnsafe bool
+	// foldedImports are the packages that rewriteConstantLen removed a
+	// reference to, by path; each that the file no longer names gets a
+	// blank import, so that its initializers still run.
+	foldedImports map[string]bool
 
 	unimplemented []gosimtool.UnimplementedHook
+
+	// exportHacks are the types, by package path, that this package names
+	// through an alias: unexported types of other packages that
+	// PublicExportHacks does not list, and types of this package whose name
+	// is hidden where it is used (typeExprAt). Each gets the alias in its
+	// own package.
+	exportHacks map[string][]exportHack
 
 	forTest bool
 
 	testFuncs map[string]bool
+
+	// pkgTypes is the package, and curPos the position of the node being
+	// translated, for unshadow.
+	pkgTypes *types.Package
+	curPos   token.Pos
+	// localAliases are package-level aliases of types of other packages,
+	// by name, that unshadow made.
+	localAliases map[string]*dst.Ident
+	// convertedGlobals are reads of globals inside implicit conversions.
+	convertedGlobals map[dst.Node]bool
 }
 
+// isBuiltIn reports whether expr names a builtin function. An expr that
+// the translation made, such as rewriteConstantLen's len, has no source
+// node and counts as no builtin.
 func (t *packageTranslator) isBuiltIn(expr dst.Expr) bool {
-	return t.typesInfo.Types[t.astMap.Nodes[expr].(ast.Expr)].IsBuiltin()
+	astExpr, ok := t.astMap.Nodes[expr].(ast.Expr)
+	return ok && t.typesInfo.Types[astExpr].IsBuiltin()
 }
 
 func (t *packageTranslator) isNamedBuiltIn(expr dst.Expr, name string) bool {
@@ -517,6 +588,19 @@ func (t *packageTranslator) getType(expr dst.Expr) (types.Type, bool) {
 	return nil, false
 }
 
+// asInt translates the size argument of make, converted to int where it
+// has another integer type: gosim's NewChan and NewMapSized take an int.
+func (t *packageTranslator) asInt(size dst.Expr) dst.Expr {
+	typ, ok := t.getType(size)
+	out := t.apply(size).(dst.Expr)
+	if ok {
+		if basic, isBasic := typ.Underlying().(*types.Basic); isBasic && (basic.Kind() == types.Int || basic.Info()&types.IsUntyped != 0) && typ == typ.Underlying() {
+			return out
+		}
+	}
+	return &dst.CallExpr{Fun: dst.NewIdent("int"), Args: []dst.Expr{out}}
+}
+
 func (t *packageTranslator) markSyncFuncsNorace(c *dstutil.Cursor) {
 	node := c.Node()
 
@@ -532,6 +616,12 @@ func (t *packageTranslator) markSyncFuncsNorace(c *dstutil.Cursor) {
 	}
 }
 
+// isBuildConstraint reports whether a comment line is a build constraint:
+// //go:build, or // +build with or without the space.
+func isBuildConstraint(line string) bool {
+	return constraint.IsGoBuild(line) || constraint.IsPlusBuild(line)
+}
+
 func (t *packageTranslator) newRuntimeSelector(name string) *dst.Ident {
 	return &dst.Ident{
 		Name: name,
@@ -544,13 +634,16 @@ func (t *packageTranslator) apply(node dst.Node) dst.Node {
 }
 
 func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
+	if n, ok := t.astMap.Nodes[c.Node()]; ok && n != nil && n.Pos().IsValid() {
+		t.curPos = n.Pos()
+	}
 	if f, ok := c.Node().(*dst.File); ok {
+		// The translation chose the files already; a constraint left in a
+		// file would be checked again without the tags of the translation.
+		// constraint.IsPlusBuild also knows //+build without a space.
 		for i, dec := range f.Decs.Start {
-			if strings.HasPrefix(dec, "//go:build") {
-				f.Decs.Start[i] = "//" // "//gosim filtered: " + dec
-			}
-			if strings.HasPrefix(dec, "// +build") {
-				f.Decs.Start[i] = "//" // "//gosim filtered: " + dec
+			if isBuildConstraint(dec) {
+				f.Decs.Start[i] = "//"
 			}
 		}
 	}
@@ -560,6 +653,9 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteImport(c)
 	t.rewriteNotifyListHack(c)
 	t.rewriteJsonGlobalsHack(c)
+	t.rewriteBigIntRand(c)
+	t.rewriteConstantLen(c)
+	t.rewriteEmbedFS(c)
 
 	// TODO: think about and make this ordering less brittle
 
@@ -639,6 +735,7 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 	}
 
 	t.needsUnsafe = false
+	t.foldedImports = nil
 
 	// in a first pass, rewrite all select stmts. unclear if this is necessary,
 	// but trying to do it preApply didn't translate inner nested selects.
@@ -654,39 +751,48 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 	t.collectUnimplemented(dstFile)
 
 	if t.needsUnsafe {
-		var importDecl *dst.GenDecl
-
-		for _, decl := range dstFile.Decls {
-			genDecl, ok := decl.(*dst.GenDecl)
-			if !ok {
-				continue
+		addBlankImport(dstFile, "unsafe")
+	}
+	if len(t.foldedImports) > 0 {
+		// A package that the file still names keeps its import as it is.
+		named := make(map[string]bool)
+		dst.Inspect(dstFile, func(n dst.Node) bool {
+			if id, ok := n.(*dst.Ident); ok && id.Path != "" {
+				named[id.Path] = true
 			}
-
-			if genDecl.Tok != token.IMPORT {
-				continue
+			return true
+		})
+		for _, path := range slices.Sorted(maps.Keys(t.foldedImports)) {
+			if replaced, ok := t.replacedPkgs[path]; ok {
+				path = replaced
 			}
-
-			importDecl = genDecl
-		}
-
-		// TODO: do this earlier, messes up comments
-		if t.needsUnsafe {
-			if importDecl == nil {
-				importDecl = &dst.GenDecl{
-					Tok: token.IMPORT,
-				}
-				dstFile.Decls = append([]dst.Decl{importDecl}, dstFile.Decls...)
+			if !named[path] {
+				addBlankImport(dstFile, path)
 			}
-			importDecl.Specs = append(importDecl.Specs,
-				&dst.ImportSpec{
-					Name: dst.NewIdent("_"),
-					Path: &dst.BasicLit{Kind: token.STRING, Value: strconv.Quote("unsafe")},
-				},
-			)
 		}
 	}
 
 	return dstFile, nil
+}
+
+// addBlankImport adds import _ "path" to the file's last import
+// declaration, or to a new one.
+func addBlankImport(file *dst.File, path string) {
+	var importDecl *dst.GenDecl
+	for _, decl := range file.Decls {
+		if genDecl, ok := decl.(*dst.GenDecl); ok && genDecl.Tok == token.IMPORT {
+			importDecl = genDecl
+		}
+	}
+	// TODO: do this earlier, messes up comments
+	if importDecl == nil {
+		importDecl = &dst.GenDecl{Tok: token.IMPORT}
+		file.Decls = append([]dst.Decl{importDecl}, file.Decls...)
+	}
+	importDecl.Specs = append(importDecl.Specs, &dst.ImportSpec{
+		Name: dst.NewIdent("_"),
+		Path: &dst.BasicLit{Kind: token.STRING, Value: strconv.Quote(path)},
+	})
 }
 
 // collectUnimplemented records every function that calls
@@ -765,6 +871,52 @@ func symbolName(pkg string, fn *dst.FuncDecl) string {
 	}
 	b.WriteString(fn.Name.Name)
 	return b.String()
+}
+
+// exportHack is an exported alias of a type, in the type's package.
+type exportHack struct {
+	name string
+	// test is set for an alias that a test package uses for its own type:
+	// it goes in a _test.go file and has a name of its own, so that it
+	// cannot clash with the alias of the base package.
+	test bool
+}
+
+func (h exportHack) alias() string {
+	if h.test {
+		return "GosimTestExportHack" + h.name
+	}
+	return "GosimPublicExportHack" + h.name
+}
+
+func (h exportHack) fileName() string {
+	if h.test {
+		return "gosimexport_" + h.name + "_test.go"
+	}
+	return "gosimexport_" + h.name + ".go"
+}
+
+func makeExportAliasFile(pkgName string, h exportHack) *dst.File {
+	return &dst.File{
+		Name: dst.NewIdent(pkgName),
+		Decls: []dst.Decl{&dst.GenDecl{
+			Tok:   token.TYPE,
+			Specs: []dst.Spec{&dst.TypeSpec{Name: dst.NewIdent(h.alias()), Assign: true, Type: dst.NewIdent(h.name)}},
+		}},
+	}
+}
+
+// addExportHack records that the package names the type name of the
+// package pkgPath through an alias, and returns the alias's name.
+func (t *packageTranslator) addExportHack(pkgPath, name string, test bool) string {
+	if t.exportHacks == nil {
+		t.exportHacks = make(map[string][]exportHack)
+	}
+	h := exportHack{name: name, test: test}
+	if !slices.Contains(t.exportHacks[pkgPath], h) {
+		t.exportHacks[pkgPath] = append(t.exportHacks[pkgPath], h)
+	}
+	return h.alias()
 }
 
 func makePublicExportHackFile(pkgName string, names []string) (*dst.File, error) {

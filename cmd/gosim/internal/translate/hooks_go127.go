@@ -8,6 +8,11 @@ var hooksGo127 = map[packageSelector]packageSelector{
 	{Pkg: "golang.org/x/sys/unix", Selector: "Syscall6"}:          {Pkg: hooksGo127Package},
 	{Pkg: "golang.org/x/sys/unix", Selector: "SyscallNoError"}:    {Pkg: hooksGo127Package},
 
+	// FcntlFlock passes a pointer, which the generic Syscall path does not.
+	{Pkg: "golang.org/x/sys/unix", Selector: "FcntlFlock"}: {Pkg: hooksGo127Package},
+	// fcntl, behind FcntlInt, is written by hand, not generated.
+	{Pkg: "golang.org/x/sys/unix", Selector: "fcntl"}: {Pkg: hooksGo127Package},
+
 	// amd64 only?
 	{Pkg: "golang.org/x/sys/unix", Selector: "gettimeofday"}: {Pkg: hooksGo127Package},
 
@@ -56,6 +61,7 @@ var hooksGo127 = map[packageSelector]packageSelector{
 
 	{Pkg: "internal/runtime/syscall/linux", Selector: "Syscall6"}: {Pkg: hooksGo127Package},
 
+	{Pkg: "internal/syscall/unix", Selector: "Fstatat"}:   {Pkg: hooksGo127Package},
 	{Pkg: "internal/syscall/unix", Selector: "GetRandom"}: {Pkg: hooksGo127Package},
 	{Pkg: "internal/syscall/unix", Selector: "fcntl"}:     {Pkg: hooksGo127Package},
 	{Pkg: "internal/syscall/unix", Selector: "Openat"}:    {Pkg: hooksGo127Package},
@@ -225,6 +231,32 @@ var hooksGo127 = map[packageSelector]packageSelector{
 }
 
 var hooksGensyscallGo127ByArch = map[string]map[packageSelector]packageSelector{}
+
+// thirdPartyHooksGo127 are hooks of packages outside the standard library,
+// for functions written in assembly, which gosim drops. TestHookSignatures
+// cannot load these packages, which are no dependencies of gosim; each
+// hook's comment gives the signature it copies.
+var thirdPartyHooksGo127 = map[packageSelector]packageSelector{
+	// func Get() int64, in github.com/petermattis/goid.
+	{Pkg: "github.com/petermattis/goid", Selector: "Get"}: {Pkg: hooksGo127Package},
+}
+
+// runtimeLinknameHooks are runtime and reflect functions that packages
+// outside the standard library declare without a body and link to with a
+// go:linkname, as Pebble and github.com/goccy/go-json do. A declaration
+// that links to one calls its hook in hooksGo127Package, named as
+// RewriteSelector names it. The value is the
+// function of the runtime package behind the linkname, for
+// TestRuntimeLinknameHooks.
+var runtimeLinknameHooks = map[packageSelector]string{
+	{Pkg: "runtime", Selector: "fastrand"}:   "legacy_fastrand",
+	{Pkg: "runtime", Selector: "fastrandn"}:  "legacy_fastrandn",
+	{Pkg: "runtime", Selector: "fastrand64"}: "legacy_fastrand64",
+	{Pkg: "runtime", Selector: "mallocgc"}:   "mallocgc",
+	// github.com/goccy/go-json reads the type sections in an initializer;
+	// with none, it keeps its caches in maps.
+	{Pkg: "reflect", Selector: "typelinks"}: "reflect_typelinks",
+}
 
 // acceptedgo127Linknames are linknames to packages gosim does not translate
 // that the translated code keeps.

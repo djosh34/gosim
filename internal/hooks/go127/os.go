@@ -17,9 +17,9 @@ func Os_sigpipe() {
 	gosimruntime.Fatal("signal: broken pipe")
 }
 
-func Os_runtime_beforeExit(exitCode int) {
-	gosimruntime.Unimplemented("os.runtime_beforeExit")
-}
+// Os_runtime_beforeExit has nothing to do: the runtime's exit hooks, race
+// detector and coverage are not part of a simulation.
+func Os_runtime_beforeExit(exitCode int) {}
 
 func Os_runtime_rand() uint64 {
 	return gosimruntime.Fastrand64()

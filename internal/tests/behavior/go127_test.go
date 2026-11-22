@@ -12,20 +12,26 @@ import (
 	"io/fs"
 	mathrand "math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
+	"runtime/metrics"
 	"runtime/pprof"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 	"weak"
 
 	"github.com/jellevandenhooff/gosim"
 	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/tests/behavior/linkname"
 )
 
 // Tests for what the Go 1.27 port added or changed.
@@ -312,6 +318,45 @@ func TestUnimplementedHook(t *testing.T) {
 	reflect.MapOf(reflect.TypeFor[string](), reflect.TypeFor[int]())
 }
 
+// TestExitStopsMachine checks that os.Exit on a machine stops it, that
+// nothing after os.Exit runs, and that what it wrote stays on its disk.
+func TestExitStopsMachine(t *testing.T) {
+	m := gosim.NewMachine(gosim.MachineConfig{
+		Label: "exit",
+		Addr:  netip.MustParseAddr("10.0.0.1"),
+		MainFunc: func() {
+			if err := os.WriteFile("before", []byte("kept"), 0o644); err != nil {
+				return
+			}
+			os.Exit(3)
+			_ = os.WriteFile("after", []byte("not kept"), 0o644)
+		},
+	})
+	m.Wait()
+	results := make(chan string, 2)
+	m.SetMainFunc(func() {
+		before, _ := os.ReadFile("before")
+		_, err := os.Stat("after")
+		results <- string(before)
+		results <- fmt.Sprint(os.IsNotExist(err))
+	})
+	m.Restart()
+	if got := <-results; got != "kept" {
+		t.Errorf("the file written before os.Exit holds %q", got)
+	}
+	if got := <-results; got != "true" {
+		t.Error("code after os.Exit ran")
+	}
+}
+
+func TestReflectLinkname(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	linkname.New()
+	t.Error("the linkname into reflect returned")
+}
+
 func TestFatalUnlock(t *testing.T) {
 	if os.Getenv("TESTINGFAIL") != "1" {
 		t.Skip()
@@ -471,4 +516,232 @@ func TestReseed(t *testing.T) {
 	if other := round(8, 3); slices.Equal(first, other) {
 		t.Errorf("seeds 7 and 8 drew the same: %v", other)
 	}
+}
+
+func TestSometimesCrashOnSyncOff(t *testing.T) {
+	// The machine turns crashes on and off again, then syncs 200 times.
+	var done bool
+	// The token orders the machine's write of done before the read here.
+	gosimruntime.TestRaceToken.Release()
+	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		defer gosimruntime.TestRaceToken.Release()
+		gosim.CurrentMachine().SetSometimesCrashOnSync(true)
+		gosim.CurrentMachine().SetSometimesCrashOnSync(false)
+		f, err := os.OpenFile("f", os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer f.Close()
+		for i := 0; i < 200; i++ {
+			if err := f.Sync(); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+		done = true
+	})
+	m.Wait()
+	gosimruntime.TestRaceToken.Acquire()
+	if !done {
+		t.Error("the machine crashed in fsync after SetSometimesCrashOnSync(false)")
+	}
+}
+
+func TestSometimesCrashOnSyncOn(t *testing.T) {
+	var done bool
+	// The token orders the machine's write of done before the read here.
+	gosimruntime.TestRaceToken.Release()
+	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		defer gosimruntime.TestRaceToken.Release()
+		gosim.CurrentMachine().SetSometimesCrashOnSync(true)
+		f, err := os.OpenFile("f", os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer f.Close()
+		for i := 0; i < 200; i++ {
+			if err := f.Sync(); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+		done = true
+	})
+	m.Wait()
+	gosimruntime.TestRaceToken.Acquire()
+	if done {
+		t.Error("200 fsyncs with SetSometimesCrashOnSync(true) and no crash")
+	}
+}
+
+// TestRuntimeState checks that the reads of the real runtime's state give
+// the simulation's fixed values.
+func TestRuntimeState(t *testing.T) {
+	if n := runtime.NumCPU(); n != gosimruntime.SimCPUs {
+		t.Errorf("NumCPU: %d, want %d", n, gosimruntime.SimCPUs)
+	}
+	if n := runtime.GOMAXPROCS(16); n != gosimruntime.SimCPUs {
+		t.Errorf("GOMAXPROCS(16): %d, want %d", n, gosimruntime.SimCPUs)
+	}
+	if n := runtime.GOMAXPROCS(0); n != gosimruntime.SimCPUs {
+		t.Errorf("GOMAXPROCS(0) after GOMAXPROCS(16): %d, want %d", n, gosimruntime.SimCPUs)
+	}
+
+	before := runtime.NumGoroutine()
+	stop := make(chan struct{})
+	go func() { <-stop }()
+	// A goroutine on another machine does not count.
+	gosimruntime.TestRaceToken.Release()
+	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		ch := stop
+		gosimruntime.TestRaceToken.Release()
+		<-ch
+	})
+	if n := runtime.NumGoroutine(); n != before+1 {
+		t.Errorf("NumGoroutine: %d, want %d", n, before+1)
+	}
+	close(stop)
+	m.Wait()
+	gosimruntime.TestRaceToken.Acquire()
+
+	ms := runtime.MemStats{Alloc: 1}
+	runtime.ReadMemStats(&ms)
+	if ms != (runtime.MemStats{}) {
+		t.Errorf("ReadMemStats: %+v, want zeros", ms)
+	}
+
+	samples := []metrics.Sample{{Name: "/sched/goroutines:goroutines"}, {Name: "/sched/latencies:seconds"}}
+	metrics.Read(samples)
+	if v := samples[0].Value; v.Kind() != metrics.KindUint64 || v.Uint64() != 0 {
+		t.Errorf("%s: %v %v, want KindUint64 0", samples[0].Name, v.Kind(), v.Uint64())
+	}
+	if v := samples[1].Value; v.Kind() != metrics.KindFloat64Histogram || len(v.Float64Histogram().Counts) == 0 {
+		t.Errorf("%s: %v, want a histogram", samples[1].Name, v.Kind())
+	} else {
+		for _, c := range v.Float64Histogram().Counts {
+			if c != 0 {
+				t.Errorf("%s: count %d, want 0", samples[1].Name, c)
+			}
+		}
+	}
+}
+
+// TestStack checks that runtime.Stack and debug.Stack give the same text on
+// every run of a seed: TestMetaDeterministic compares the logged stacks.
+func TestStack(t *testing.T) {
+	buf := make([]byte, 1<<16)
+	stacks := []string{string(buf[:runtime.Stack(buf, false)]), string(debug.Stack())}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		stacks = append(stacks, string(debug.Stack()))
+	}()
+	<-done
+	for _, s := range stacks {
+		t.Log(s)
+		if !strings.HasPrefix(s, "goroutine ") || !strings.Contains(s, "TestStack") {
+			t.Errorf("not a stack of TestStack:\n%s", s)
+		}
+		if strings.Contains(s, " in goroutine ") || strings.Contains(s, "gosimruntime.Stack(") {
+			t.Errorf("a stack names a creating goroutine or Stack itself:\n%s", s)
+		}
+		for _, line := range strings.Split(s, "\n") {
+			if !strings.HasPrefix(line, "\t") && strings.Contains(line, "0x") {
+				t.Errorf("a frame shows its arguments: %s", line)
+			}
+		}
+	}
+}
+
+// TestExitNonzero calls os.Exit(3) on the main machine; the meta test
+// checks that the run fails.
+func TestExitNonzero(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	os.Exit(3)
+}
+
+// TestPanicLog panics on a goroutine; the meta test checks that two runs
+// give the same checksum.
+func TestPanicLog(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	go panic("a panic for the log")
+	select {}
+}
+
+// TestRawHandledSyscall makes a syscall the simulation handles through
+// RawSyscall6, bypassing package syscall: it fails, and the run goes on.
+func TestRawHandledSyscall(t *testing.T) {
+	_, _, errno := syscall.RawSyscall6(syscall.SYS_FCHMOD, ^uintptr(0), 0o644, 0, 0, 0, 0)
+	// Natively, fchmod of no file fails with EBADF.
+	if want := map[bool]syscall.Errno{true: syscall.ENOSYS, false: syscall.EBADF}[gosim.IsSim()]; errno != want {
+		t.Errorf("got %v, want %v", errno, want)
+	}
+}
+
+func stackAllBlocked(ch chan struct{}) { <-ch }
+
+func stackAllSpinning(stop *atomic.Bool) {
+	for !stop.Load() {
+		runtime.Gosched()
+	}
+}
+
+// TestStackAll checks that runtime.Stack with all lists the goroutines of
+// the caller's machine, and only those.
+func TestStackAll(t *testing.T) {
+	ch := make(chan struct{})
+	defer close(ch)
+	go stackAllBlocked(ch)
+	var stop atomic.Bool
+	defer stop.Store(true)
+	go stackAllSpinning(&stop)
+	gosimruntime.TestRaceToken.Release()
+	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		c := ch
+		gosimruntime.TestRaceToken.Release()
+		otherMachineBlocked(c)
+	})
+	// Let the goroutines start; time does not pass while one spins.
+	for range 10 {
+		runtime.Gosched()
+	}
+	buf := make([]byte, 1<<16)
+	s := string(buf[:runtime.Stack(buf, true)])
+	t.Log(s)
+	if !strings.Contains(s, "stackAllBlocked") || !strings.Contains(s, "TestStackAll") {
+		t.Errorf("not the stacks of this machine's goroutines:\n%s", s)
+	}
+	for fn, state := range map[string]string{"stackAllSpinning": "[runnable]", "stackAllBlocked": "[waiting]"} {
+		if header := stackHeaderOf(s, fn); !strings.Contains(header, state) {
+			t.Errorf("%s: header %q, want %s", fn, header, state)
+		}
+	}
+	if strings.Contains(s, "otherMachineBlocked") {
+		t.Errorf("a goroutine of another machine:\n%s", s)
+	}
+	_ = m
+}
+
+func otherMachineBlocked(ch chan struct{}) { <-ch }
+
+// stackHeaderOf returns the "goroutine N [state]:" line of the stack in
+// dump that runs fn.
+func stackHeaderOf(dump, fn string) string {
+	for _, stack := range strings.Split(dump, "\ngoroutine ") {
+		if strings.Contains(stack, "."+fn+"(") {
+			header, _, _ := strings.Cut(stack, "\n")
+			return header
+		}
+	}
+	return ""
 }

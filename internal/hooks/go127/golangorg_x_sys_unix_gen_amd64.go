@@ -32,8 +32,20 @@ func GolangOrgXSysUnix_connect(s int, addr unsafe.Pointer, addrlen simulation.So
 	return simulation.SyscallSysConnect(s, addr, addrlen)
 }
 
+func GolangOrgXSysUnix_Fadvise(fd int, offset int64, length int64, advice int) (err error) {
+	return simulation.SyscallSysFadvise64(fd, offset, length, advice)
+}
+
 func GolangOrgXSysUnix_Fallocate(fd int, mode uint32, off int64, len int64) (err error) {
 	return simulation.SyscallSysFallocate(fd, mode, off, len)
+}
+
+func GolangOrgXSysUnix_Fchmod(fd int, mode uint32) (err error) {
+	return simulation.SyscallSysFchmod(fd, mode)
+}
+
+func GolangOrgXSysUnix_fchmodat(dirfd int, path string, mode uint32) (err error) {
+	return simulation.SyscallSysFchmodat(dirfd, path, mode)
 }
 
 func GolangOrgXSysUnix_Fdatasync(fd int) (err error) {
@@ -52,6 +64,10 @@ func GolangOrgXSysUnix_Fstatat(dirfd int, path string, stat *simulation.Stat_t, 
 	return simulation.SyscallSysNewfstatat(dirfd, path, stat, flags)
 }
 
+func GolangOrgXSysUnix_Fstatfs(fd int, buf *simulation.Statfs_t) (err error) {
+	return simulation.SyscallSysFstatfs(fd, buf)
+}
+
 func GolangOrgXSysUnix_Fsync(fd int) (err error) {
 	return simulation.SyscallSysFsync(fd)
 }
@@ -64,7 +80,7 @@ func GolangOrgXSysUnix_Getcwd(buf []byte) (n int, err error) {
 	return simulation.SyscallSysGetcwd(buf)
 }
 
-func GolangOrgXSysUnix_Getdents(fd int, buf []byte) (n int, err error) {
+func GolangOrgXSysUnix_getdents(fd int, buf []byte) (n int, err error) {
 	return simulation.SyscallSysGetdents64(fd, buf)
 }
 
@@ -138,6 +154,10 @@ func GolangOrgXSysUnix_setsockopt(s int, level int, name int, val unsafe.Pointer
 
 func GolangOrgXSysUnix_socket(domain int, typ int, proto int) (fd int, err error) {
 	return simulation.SyscallSysSocket(domain, typ, proto)
+}
+
+func GolangOrgXSysUnix_Statfs(path string, buf *simulation.Statfs_t) (err error) {
+	return simulation.SyscallSysStatfs(path, buf)
 }
 
 func GolangOrgXSysUnix_Uname(buf *simulation.Utsname) (err error) {

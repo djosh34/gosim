@@ -184,7 +184,7 @@ func (g *GosimOS) MachineSetSometimesCrashOnSync(machineID int, value bool, invo
 	machine := g.simulation.machinesById[machineID]
 	// XXX: on restart how do we copy these?
 	machine.sometimesCrashOnSyncMu.Lock()
-	machine.sometimesCrashOnSync = true
+	machine.sometimesCrashOnSync = value
 	machine.sometimesCrashOnSyncMu.Unlock()
 	return nil
 }

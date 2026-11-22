@@ -148,15 +148,21 @@ func (t *packageTranslator) rewriteMapClear(c *dstutil.Cursor) {
 func (t *packageTranslator) rewriteMakeMap(c *dstutil.Cursor) {
 	if makeExpr, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(makeExpr.Fun, "make") {
 		if typ, ok := t.isMapType(makeExpr); ok {
+			fun, args := "NewMap", []dst.Expr{}
+			if len(makeExpr.Args) >= 2 {
+				// The size has effects to keep, and uses of the
+				// variables in it.
+				fun, args = "NewMapSized", []dst.Expr{t.asInt(makeExpr.Args[1])}
+			}
 			c.Replace(t.maybeConvertMapType(&dst.CallExpr{
 				Fun: &dst.IndexListExpr{
-					X: t.newRuntimeSelector("NewMap"),
+					X: t.newRuntimeSelector(fun),
 					Indices: []dst.Expr{
 						t.makeTypeExpr(typ.Type.Key()),
 						t.makeTypeExpr(typ.Type.Elem()),
 					},
 				},
-				Args: []dst.Expr{},
+				Args: args,
 			}, typ))
 		}
 	}
@@ -275,7 +281,7 @@ func (t *packageTranslator) rewriteMapImplicitConversion(c *dstutil.Cursor) {
 			if _, ok := isTypMapType(typ); ok {
 				c.Replace(&dst.CallExpr{
 					Fun:  t.makeTypeExpr(typ),
-					Args: []dst.Expr{expr},
+					Args: []dst.Expr{t.convertedGlobal(expr)},
 				})
 			}
 		}
@@ -300,7 +306,9 @@ func (t *packageTranslator) rewriteMapType(c *dstutil.Cursor) {
 		c.Replace(&dst.IndexListExpr{
 			X: t.newRuntimeSelector("Map"),
 			Indices: []dst.Expr{
-				mapType.Key,
+				// A key may hold a type that translates too, such as
+				// a channel.
+				t.apply(mapType.Key).(dst.Expr),
 				t.apply(mapType.Value).(dst.Expr),
 			},
 		})
@@ -313,7 +321,7 @@ func (t *packageTranslator) rewriteMapType(c *dstutil.Cursor) {
 			c.Replace(&dst.IndexListExpr{
 				X: t.newRuntimeSelector("MapConstraint"),
 				Indices: []dst.Expr{
-					mapType.Key,
+					t.apply(mapType.Key).(dst.Expr),
 					t.apply(mapType.Value).(dst.Expr),
 				},
 			})
@@ -385,7 +393,13 @@ func (t *packageTranslator) replaceWithMapModify(c *dstutil.Cursor, x, index dst
 		Tok: token.DEFINE,
 		Rhs: []dst.Expr{x, index},
 	}
-	c.InsertBefore(copyVarsStmt)
+	// A statement outside a list, such as the post statement of a for loop
+	// or a labeled statement, has no room for a statement before it; there
+	// both go in a function literal that runs in its place.
+	inList := c.Index() >= 0
+	if inList {
+		c.InsertBefore(copyVarsStmt)
+	}
 
 	writeExpr := &dst.CallExpr{
 		Fun: &dst.SelectorExpr{
@@ -408,6 +422,14 @@ func (t *packageTranslator) replaceWithMapModify(c *dstutil.Cursor, x, index dst
 				Y:  t.apply(val).(dst.Expr),
 			},
 		},
+	}
+	if !inList {
+		writeExpr = &dst.CallExpr{
+			Fun: &dst.FuncLit{
+				Type: &dst.FuncType{Params: &dst.FieldList{}},
+				Body: &dst.BlockStmt{List: []dst.Stmt{copyVarsStmt, &dst.ExprStmt{X: writeExpr}}},
+			},
+		}
 	}
 	c.Replace(&dst.ExprStmt{
 		Decs: dst.ExprStmtDecorations{

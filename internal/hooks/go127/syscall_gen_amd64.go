@@ -36,6 +36,14 @@ func Syscall_Fallocate(fd int, mode uint32, off int64, len int64) (err error) {
 	return simulation.SyscallSysFallocate(fd, mode, off, len)
 }
 
+func Syscall_Fchmod(fd int, mode uint32) (err error) {
+	return simulation.SyscallSysFchmod(fd, mode)
+}
+
+func Syscall_fchmodat(dirfd int, path string, mode uint32) (err error) {
+	return simulation.SyscallSysFchmodat(dirfd, path, mode)
+}
+
 func Syscall_fcntl(fd int, cmd int, arg int) (val int, err error) {
 	return simulation.SyscallSysFcntl(fd, cmd, arg)
 }
@@ -54,6 +62,10 @@ func Syscall_Fstat(fd int, stat *simulation.Stat_t) (err error) {
 
 func Syscall_fstatat(fd int, path string, stat *simulation.Stat_t, flags int) (err error) {
 	return simulation.SyscallSysNewfstatat(fd, path, stat, flags)
+}
+
+func Syscall_Fstatfs(fd int, buf *simulation.Statfs_t) (err error) {
+	return simulation.SyscallSysFstatfs(fd, buf)
 }
 
 func Syscall_Fsync(fd int) (err error) {
@@ -138,6 +150,10 @@ func Syscall_setsockopt(s int, level int, name int, val unsafe.Pointer, vallen u
 
 func Syscall_socket(domain int, typ int, proto int) (fd int, err error) {
 	return simulation.SyscallSysSocket(domain, typ, proto)
+}
+
+func Syscall_Statfs(path string, buf *simulation.Statfs_t) (err error) {
+	return simulation.SyscallSysStatfs(path, buf)
 }
 
 func Syscall_Uname(buf *simulation.Utsname) (err error) {

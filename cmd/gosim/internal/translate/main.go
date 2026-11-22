@@ -10,6 +10,7 @@ import (
 	"path"
 	"runtime/pprof"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -114,6 +115,14 @@ var replacements = map[packageSelector]packageSelector{
 	{Pkg: "runtime", Selector: "SetFinalizer"}:             {Pkg: gosimruntimePackage, Selector: "SetFinalizer"},
 	{Pkg: "runtime", Selector: "GOOS"}:                     {Pkg: gosimruntimePackage, Selector: "GOOS"},
 	{Pkg: "runtime", Selector: "Gosched"}:                  {Pkg: gosimruntimePackage, Selector: "Yield"},
+	// The real runtime's state differs between runs of a seed; see
+	// gosimruntime/runtimestate.go.
+	{Pkg: "runtime", Selector: "NumCPU"}:       {Pkg: gosimruntimePackage, Selector: "NumCPU"},
+	{Pkg: "runtime", Selector: "GOMAXPROCS"}:   {Pkg: gosimruntimePackage, Selector: "GOMAXPROCS"},
+	{Pkg: "runtime", Selector: "NumGoroutine"}: {Pkg: gosimruntimePackage, Selector: "NumGoroutine"},
+	{Pkg: "runtime", Selector: "Stack"}:        {Pkg: gosimruntimePackage, Selector: "Stack"},
+	{Pkg: "runtime", Selector: "ReadMemStats"}: {Pkg: gosimruntimePackage, Selector: "ReadMemStats"},
+	{Pkg: "runtime/metrics", Selector: "Read"}: {Pkg: gosimruntimePackage, Selector: "ReadMetrics"},
 }
 
 const gosimModPath = gosimtool.Module
@@ -512,7 +521,12 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 
 	translateToolHash := computeTranslateToolHash(cfg)
 
+	// GOSIM_TRANSLATE_WORKERS sets how many packages translate at once;
+	// each holds its syntax trees, so fewer use less memory.
 	numWorkers := 32
+	if n, err := strconv.Atoi(os.Getenv("GOSIM_TRANSLATE_WORKERS")); err == nil && n > 0 {
+		numWorkers = n
+	}
 
 	packageHashes := make(map[string]Hash)
 
@@ -521,7 +535,6 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 	})
 
 	allResults := make(map[string]*TranslatePackageResult)
-	cacheHits := make(map[Hash]bool)
 
 	uncachedPackages := make(map[string]struct{})
 	for pkgId, hash := range packageHashes {
@@ -533,7 +546,6 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 		}
 		if res != nil {
 			allResults[pkgId] = res
-			cacheHits[hash] = true // record cache hits so we don't update the cache for them
 		} else {
 			uncachedPackages[strings.TrimSuffix(pkg.PkgPath, "_test")] = struct{}{}
 		}
@@ -543,8 +555,10 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 
 	replacedPkgs, packageNames := buildReplacePackagesAndPackageNames(convertPkgs, allPkgs)
 
+	// Each package's translation goes into the cache as soon as it is done,
+	// so a translation that fails later keeps the work done so far.
 	buildInParallel(packageGraph, numWorkers, allResults, func(pkgId string, localResults map[string]*TranslatePackageResult) *TranslatePackageResult {
-		return translatePackage(&translatePackageArgs{
+		res := translatePackage(&translatePackageArgs{
 			cfg:                cfg,
 			pkg:                pkgById[pkgId],
 			replacedPkgs:       replacedPkgs,
@@ -553,16 +567,11 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 			importResults:      localResults,
 			pkgWithTypesAndAst: pkgsWithTypesAndAst[pkgId],
 		})
-	})
-
-	for pkgId, res := range allResults {
-		hash := packageHashes[pkgId]
-		if !cacheHits[hash] {
-			if err := cachePut(cache, hash, res); err != nil {
-				log.Fatal(err)
-			}
+		if err := cachePut(cache, packageHashes[pkgId], res); err != nil {
+			log.Fatal(err)
 		}
-	}
+		return res
+	})
 
 	writer := newOutputWriter()
 	for _, res := range allResults {

@@ -1,6 +1,6 @@
 module github.com/jellevandenhooff/gosim/cmd/gosim
 
-go 1.27.2
+go 1.27.4
 
 require (
 	github.com/dave/dst v0.27.3

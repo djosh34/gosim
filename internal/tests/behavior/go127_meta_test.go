@@ -4,11 +4,14 @@ package behavior_test
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jellevandenhooff/gosim/internal/gosimtool"
 	"github.com/jellevandenhooff/gosim/metatesting"
 )
 
@@ -55,6 +58,17 @@ func TestWallKill(t *testing.T) {
 	}
 }
 
+func TestReflectLinkname(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestReflectLinkname", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "unimplemented hook: github.com/jellevandenhooff/gosim/internal/tests/behavior/linkname.unsafeNew"; !run.Failed || run.Err != want {
+		t.Errorf("got failed %v, err %q; want err %q", run.Failed, run.Err, want)
+	}
+}
+
 func TestUnimplementedHook(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestUnimplementedHook", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
@@ -98,5 +112,50 @@ func TestMaphashComparable(t *testing.T) {
 	}
 	if want := "unimplemented hook: hash/maphash.comparableHashUnimplemented"; !run.Failed || run.Err != want {
 		t.Errorf("got failed %v, err %q; want err %q\n%s", run.Failed, run.Err, want, run.LogOutput)
+	}
+}
+
+func TestForTestBinary(t *testing.T) {
+	// A copy of the binary elsewhere, as a campaign's jobs download it.
+	built := gosimtool.GetPathForPrecompiledTestBinary(t, "github.com/jellevandenhooff/gosim/internal/tests/behavior", nil)
+	data, err := os.ReadFile(built)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "behavior.test")
+	if err := os.WriteFile(path, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run, err := metatesting.ForTestBinary(t, path).RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1})
+	if err != nil || run.Failed || string(run.Artifacts["artifact.txt"]) != "hello" {
+		t.Errorf("got %v, %+v", err, run)
+	}
+}
+
+func TestExitNonzero(t *testing.T) {
+	run, err := metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestExitNonzero", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "os.Exit(3) on the main machine"; !run.Failed || !strings.Contains(run.Err, want) {
+		t.Errorf("got failed %v, err %q; want err with %q", run.Failed, run.Err, want)
+	}
+}
+
+func TestPanicLog(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	var checksums []string
+	for range 2 {
+		run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestPanicLog", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !run.Failed || !strings.Contains(string(run.LogOutput), "a panic for the log") {
+			t.Fatalf("got failed %v, log %s", run.Failed, run.LogOutput)
+		}
+		checksums = append(checksums, string(run.Checksum))
+	}
+	if checksums[0] != checksums[1] {
+		t.Errorf("two runs of a panic gave different checksums")
 	}
 }

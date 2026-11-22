@@ -328,6 +328,32 @@ func ForOtherPackage(t *testing.T, pkg string, tags ...string) *MetaT {
 	return runner
 }
 
+// ForTestBinary returns a *MetaT for the test binary at path, which gosim
+// build-tests built. Unlike ForOtherPackage, it does not check that the
+// binary is newer than its sources: it is for a binary built once and
+// copied to the machines that run it, where every checkout of the sources
+// is new.
+func ForTestBinary(t *testing.T, path string) *MetaT {
+	if gosimruntime.IsSim() {
+		t.Fatalf("metatest cannot be used from within gosim")
+	}
+
+	runnerMapMu.Lock()
+	defer runnerMapMu.Unlock()
+
+	key := "binary " + path
+	if runner, ok := runnerMap[key]; ok {
+		return runner
+	}
+	runner, err := newRunner(path)
+	if err != nil {
+		t.Fatalf("failed to run test binary: %s", err)
+	}
+	runner.key = key
+	runnerMap[key] = runner
+	return runner
+}
+
 // getCurrentPackageFromWorkingdir guesses the package
 // that `go test` is testing from the working directory.
 func getCurrentPackageFromWorkingdir() string {

@@ -194,6 +194,19 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 						// gosim does not translate, such as runtime.
 						decl.Decs.Start[i] = "// gosim unimplemented: " + val
 						unimplemented = true
+					} else if _, ok := runtimeLinknameHooks[packageSelector{Pkg: pkg, Selector: name}]; ok && decl.Body == nil {
+						hooks := hooksGo127Package
+						if replaced, ok := t.replacedPkgs[hooks]; ok {
+							hooks = replaced
+						}
+						parts[2] = fmt.Sprintf("%s.%s", hooks, RewriteSelector(pkg, name))
+						decl.Decs.Start[i] = strings.Join(parts, " ")
+					} else if pkg == "reflect" && decl.Body == nil && !isStdPackage(t.pkgPath) {
+						// A package outside the standard library that reaches
+						// into reflect, as github.com/goccy/go-json does, links
+						// to internals that gosim's reflect does not have.
+						decl.Decs.Start[i] = "// gosim unimplemented: " + val
+						unimplemented = true
 					} else if newPkg, ok := t.replacedPkgs[pkg]; ok {
 						slog.Debug("rewriting linkname", "pkg", t.pkgPath, "name", decl.Name.Name)
 
@@ -344,4 +357,233 @@ func (t *packageTranslator) rewriteNotifyListHack(c *dstutil.Cursor) {
 			}
 		}
 	}
+}
+
+// rewriteBigIntRand rewrites z.Rand(rnd, n) on a *big.Int into a call of
+// the hook BigIntRand. math/big is not translated, and its Rand takes the
+// native *rand.Rand, where translated code has the translated one.
+func (t *packageTranslator) rewriteBigIntRand(c *dstutil.Cursor) {
+	call, ok := c.Node().(*dst.CallExpr)
+	if !ok {
+		return
+	}
+	sel, ok := call.Fun.(*dst.SelectorExpr)
+	if !ok {
+		return
+	}
+	astSel, ok := t.astMap.Nodes[sel].(*ast.SelectorExpr)
+	if !ok {
+		return
+	}
+	selection, ok := t.typesInfo.Selections[astSel]
+	if !ok || selection.Kind() != types.MethodVal {
+		return
+	}
+	fn := selection.Obj()
+	if fn.Pkg() == nil || fn.Pkg().Path() != "math/big" || fn.Name() != "Rand" {
+		return
+	}
+	if recv := fn.Type().(*types.Signature).Recv(); recv == nil || recv.Type().String() != "*math/big.Int" {
+		return
+	}
+	z := t.apply(sel.X).(dst.Expr)
+	if typ, ok := t.getType(sel.X); ok {
+		if _, isPtr := typ.Underlying().(*types.Pointer); !isPtr {
+			z = &dst.UnaryExpr{Op: token.AND, X: z}
+		}
+	}
+	args := []dst.Expr{z}
+	for _, arg := range call.Args {
+		args = append(args, t.apply(arg).(dst.Expr))
+	}
+	c.Replace(&dst.CallExpr{
+		Fun:  &dst.Ident{Name: "BigIntRand", Path: translatedHooksPackage},
+		Args: args,
+	})
+}
+
+// isStdPackage reports whether the package is in the standard library,
+// whose paths have no dot in their first element.
+func isStdPackage(pkgPath string) bool {
+	first, _, _ := strings.Cut(pkgPath, "/")
+	return !strings.Contains(first, ".")
+}
+
+// rewriteConstantLen replaces len(x) and cap(x) that are constants, as for
+// an array x, with a constant that translation keeps constant, where
+// translation would make x non-constant: when x names a package-level
+// variable, which gosim moves into the package's globals, or holds a map
+// or channel value, which becomes a call (lenOperand). Go does not evaluate x in such
+// a call, so nothing is lost; left alone, the translated x would be
+// evaluated, and could panic, and an array length or a const declaration
+// would not compile.
+//
+// A package that x names, and the file names nowhere else, gets a blank
+// import (foldedImports), which keeps its initializers running.
+//
+// The constant is len([N]struct{}{}), with the call's own builtin, len or
+// cap, which resolves to the builtin here and names nothing a local could
+// hide. The local variables that x uses stay used, in a term that is zero
+// and evaluates nothing: + 0*len([K]interface{}{v1, ..., vK}).
+func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
+	call, ok := c.Node().(*dst.CallExpr)
+	if !ok || !(t.isNamedBuiltIn(call.Fun, "len") || t.isNamedBuiltIn(call.Fun, "cap")) {
+		return
+	}
+	astCall, ok := t.astMap.Nodes[call].(*ast.CallExpr)
+	if !ok {
+		return
+	}
+	tv, ok := t.typesInfo.Types[astCall]
+	if !ok || tv.Value == nil {
+		return
+	}
+	becomesCall, locals := t.lenOperand(astCall.Args[0])
+	if !becomesCall {
+		return
+	}
+	// The packages the operand names, as pkg.Name or through a dot
+	// import, may have no other reference left.
+	ast.Inspect(astCall.Args[0], func(n ast.Node) bool {
+		id, ok := n.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		var path string
+		switch obj := t.typesInfo.Uses[id].(type) {
+		case *types.PkgName:
+			path = obj.Imported().Path()
+		case nil:
+		default:
+			// A name of another package without its qualifier: a dot
+			// import.
+			if pkg := obj.Pkg(); pkg != nil && pkg != t.pkgTypes && obj.Parent() == pkg.Scope() {
+				path = pkg.Path()
+			}
+		}
+		if path != "" {
+			if t.foldedImports == nil {
+				t.foldedImports = make(map[string]bool)
+			}
+			t.foldedImports[path] = true
+		}
+		return true
+	})
+	builtin := call.Fun.(*dst.Ident).Name
+	array := func(n string, elt dst.Expr, elts []dst.Expr) dst.Expr {
+		return &dst.CallExpr{
+			Fun: dst.NewIdent(builtin),
+			Args: []dst.Expr{&dst.CompositeLit{
+				Type: &dst.ArrayType{Len: &dst.BasicLit{Kind: token.INT, Value: n}, Elt: elt},
+				Elts: elts,
+			}},
+		}
+	}
+	var folded dst.Expr = array(tv.Value.ExactString(), &dst.StructType{Fields: &dst.FieldList{Opening: true, Closing: true}}, nil)
+	if len(locals) > 0 {
+		var uses []dst.Expr
+		for _, name := range locals {
+			uses = append(uses, dst.NewIdent(name))
+		}
+		folded = &dst.BinaryExpr{
+			X:  folded,
+			Op: token.ADD,
+			Y: &dst.BinaryExpr{
+				X:  &dst.BasicLit{Kind: token.INT, Value: "0"},
+				Op: token.MUL,
+				Y:  array(fmt.Sprint(len(locals)), &dst.InterfaceType{Methods: &dst.FieldList{Opening: true, Closing: true}}, uses),
+			},
+		}
+		folded = &dst.ParenExpr{X: folded}
+	}
+	folded.Decorations().Start = call.Decs.NodeDecs.Start
+	folded.Decorations().End = call.Decs.NodeDecs.End
+	c.Replace(folded)
+}
+
+// lenOperand reports whether translation makes expr non-constant, as
+// rewriteConstantLen describes, and the local variables that expr uses,
+// each once, in order, but not those declared in expr. gosim translates
+// every value of a map or channel type, a nil one too, into a call; an
+// element of such a type in a composite literal may be an untyped nil, so
+// the literal's element type and any nil count as well.
+func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall bool, locals []string) {
+	isMapOrChan := func(typ types.Type) bool {
+		if typ == nil {
+			return false
+		}
+		switch typ.Underlying().(type) {
+		case *types.Map, *types.Chan:
+			return true
+		}
+		return false
+	}
+	ast.Inspect(expr, func(n ast.Node) bool {
+		e, ok := n.(ast.Expr)
+		if !ok {
+			return true
+		}
+		if tv, ok := t.typesInfo.Types[e]; ok && tv.IsValue() && isMapOrChan(tv.Type) {
+			becomesCall = true
+		}
+		switch e := e.(type) {
+		case *ast.Ident:
+			switch obj := t.typesInfo.Uses[e].(type) {
+			case *types.Nil:
+				// nil may be a map or channel, such as a struct field's,
+				// whose type no expression here has; folding where it is
+				// not one is harmless.
+				becomesCall = true
+			case *types.Var:
+				inside := obj.Pos() >= expr.Pos() && obj.Pos() < expr.End()
+				switch {
+				case obj.IsField() || obj.Pkg() == nil || inside:
+					// A field, or a variable declared in expr, as in a
+					// function literal, which needs no use outside it.
+				case obj.Parent() == obj.Pkg().Scope():
+					becomesCall = true
+				case !slices.Contains(locals, e.Name):
+					locals = append(locals, e.Name)
+				}
+			}
+		case *ast.CompositeLit:
+			if typ := t.typesInfo.TypeOf(e); typ != nil && len(e.Elts) > 0 {
+				if elems, ok := typ.Underlying().(interface{ Elem() types.Type }); ok && isMapOrChan(elems.Elem()) {
+					becomesCall = true
+				}
+			}
+		}
+		return true
+	})
+	return becomesCall, locals
+}
+
+// rewriteEmbedFS wraps an embed.FS that is converted to an interface of
+// the translated io/fs, such as fs.FS, in the hook EmbedFS. gosim does not
+// translate embed, so embed.FS implements only the native interfaces.
+func (t *packageTranslator) rewriteEmbedFS(c *dstutil.Cursor) {
+	expr, ok := c.Node().(dst.Expr)
+	if !ok {
+		return
+	}
+	astExpr, ok := t.astMap.Nodes[expr].(ast.Expr)
+	if !ok {
+		return
+	}
+	to, ok := t.implicitConversions[astExpr]
+	if !ok || !types.IsInterface(to) || to.Underlying().(*types.Interface).Empty() {
+		return
+	}
+	from, ok := t.getType(expr)
+	if !ok {
+		return
+	}
+	named, ok := from.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != "embed" || named.Obj().Name() != "FS" {
+		return
+	}
+	c.Replace(&dst.CallExpr{
+		Fun:  &dst.Ident{Name: "EmbedFS", Path: translatedHooksPackage},
+		Args: []dst.Expr{t.convertedGlobal(expr)},
+	})
 }

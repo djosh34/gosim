@@ -136,9 +136,29 @@ func (t *packageTranslator) isGlobalUse(node dst.Node) (dst.Expr, bool) {
 }
 
 func (t *packageTranslator) rewriteGlobalRead(c *dstutil.Cursor) {
+	if t.convertedGlobals[c.Node()] {
+		// An implicit conversion holds the global's read already
+		// (convertedGlobal); the cursor still shows the global after that
+		// replacement.
+		return
+	}
 	if replacement, ok := t.isGlobalUse(c.Node()); ok {
 		c.Replace(replacement)
 	}
+}
+
+// convertedGlobal returns what an implicit conversion of expr converts: the
+// read of the global, if expr is one, which rewriteGlobalRead then skips.
+func (t *packageTranslator) convertedGlobal(expr dst.Expr) dst.Expr {
+	replacement, ok := t.isGlobalUse(expr)
+	if !ok {
+		return expr
+	}
+	if t.convertedGlobals == nil {
+		t.convertedGlobals = make(map[dst.Node]bool)
+	}
+	t.convertedGlobals[expr] = true
+	return replacement
 }
 
 func (t *packageTranslator) rewriteGlobalDef(c *dstutil.Cursor) {
@@ -251,6 +271,14 @@ func makeDetgoGlobalsFile(t *packageTranslator, pkgName string, forTest bool) (*
 			// translates, hold this initializer.
 			continue
 		}
+		if len(initializer.Lhs) == 1 && initializer.Lhs[0].Name() == "_" {
+			if id, ok := initializer.Rhs.(*ast.Ident); ok && id.Name == "nil" && t.typesInfo.Uses[id] == types.Universe.Lookup("nil") {
+				// var _ T = nil checks only that nil is a T; "_ = nil" does
+				// not compile, and nil has no effects to keep.
+				continue
+			}
+		}
+
 		var lhs []dst.Expr
 
 		shouldShare := t.globalInfo.ByPackage[t.pkgPath].ShouldShare[initializer.Lhs[0].Name()]

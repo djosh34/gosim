@@ -35,7 +35,10 @@ type LinuxOS struct {
 	mu       sync.Mutex
 	shutdown bool
 
-	files  map[int]interface{}
+	files map[int]interface{}
+	// dupFds are the descriptors at or above nextFd that F_DUPFD handed
+	// out, closed or not, which allocFd skips.
+	dupFds map[int]bool
 	nextFd int
 
 	mmaps map[uintptr]*fs.Mmap
@@ -58,6 +61,7 @@ func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.
 		machine: machine,
 
 		files:  make(map[int]interface{}),
+		dupFds: make(map[int]bool),
 		nextFd: 5,
 
 		mmaps: make(map[uintptr]*fs.Mmap),
@@ -164,9 +168,13 @@ func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ..
 // //go:uintptrescapes
 func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err syscall.Errno) {
 	if IsHandledSyscall(trap) {
-		// complain loudly if syscall that we support arrives
-		// here instead of through our renames
-		panic("syscall should have been rewritten somewhere")
+		// A syscall the simulation handles arrives here raw, from code
+		// that calls RawSyscall6 itself rather than through package
+		// syscall's wrappers, which gosim renames. It fails with ENOSYS,
+		// as any syscall the simulation does not handle, for the caller
+		// to deal with.
+		logf("raw syscall %s (%d), which the simulation handles only through package syscall", SyscallName(trap), trap)
+		return 0, 0, syscall.ENOSYS
 	}
 
 	logf("unsupported syscall %s (%d) %d %d %d %d %d %d", SyscallName(trap), trap, a1, a2, a3, a4, a5, a6)
@@ -174,10 +182,40 @@ func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err sysc
 	return 0, 0, syscall.ENOSYS
 }
 
+// maxFds is the limit of a machine's file descriptors, Linux's default hard
+// limit of open files.
+const maxFds = 1 << 20
+
+// lowestFreeFd takes the lowest free file descriptor at or above min and
+// below maxFds, as F_DUPFD does, and reports false if there is none. 0 to
+// 2 are the standard files'. The caller puts the descriptor in files.
+func (l *LinuxOS) lowestFreeFd(min int) (int, bool) {
+	for fd := max(min, 3); fd < maxFds; fd++ {
+		if _, ok := l.files[fd]; !ok {
+			if fd >= l.nextFd {
+				l.dupFds[fd] = true
+			}
+			return fd, true
+		}
+	}
+	return 0, false
+}
+
+// allocFd returns a new file descriptor for open, socket and accept: the
+// next one from nextFd up that no one has had, so that a descriptor
+// closed is not handed out again by them, which makes a use after close
+// fail. It skips the ones F_DUPFD took above nextFd (dupFds). The caller
+// puts the descriptor in files.
 func (l *LinuxOS) allocFd() int {
-	fd := l.nextFd
-	l.nextFd++
-	return fd
+	for {
+		fd := l.nextFd
+		l.nextFd++
+		taken := l.dupFds[fd]
+		delete(l.dupFds, fd)
+		if !taken {
+			return fd
+		}
+	}
 }
 
 func (l *LinuxOS) PollOpen(fd int, desc syscallabi.ValueView[syscallabi.PollDesc], invocation *syscallabi.Syscall) int {
@@ -240,13 +278,15 @@ type (
 	RawSockaddrAny = syscall.RawSockaddrAny
 	Utsname        = syscall.Utsname
 	Stat_t         = syscall.Stat_t
+	Statfs_t       = syscall.Statfs_t
 )
 
 type Socklen uint32
 
 const (
-	_AT_FDCWD     = -0x64
-	_AT_REMOVEDIR = 0x200
+	_AT_FDCWD            = -0x64
+	_AT_REMOVEDIR        = 0x200
+	_AT_SYMLINK_NOFOLLOW = 0x100
 )
 
 // TODO: make functions instead return Errno again?
@@ -277,6 +317,8 @@ type OsFile struct {
 	name                string
 	pos                 int64
 	flagRead, flagWrite bool
+	// flagAppend is O_APPEND: every write goes to the end of the file.
+	flagAppend bool
 
 	didReaddir bool // XXX JANK
 }
@@ -296,11 +338,21 @@ type Socket struct {
 	// tcp conn
 }
 
+// dirInodeForFd returns the directory that paths relative to dirfd start
+// from: the working directory for AT_FDCWD, or an open directory, as
+// os.File.ReadDir and os.RemoveAll use.
 func (l *LinuxOS) dirInodeForFd(dirfd int) (int, error) {
-	if dirfd != _AT_FDCWD {
-		return 0, syscall.EINVAL // XXX?
+	if dirfd == _AT_FDCWD {
+		return l.workdirInode, nil
 	}
-	return l.workdirInode, nil
+	f, ok := l.files[dirfd].(*OsFile)
+	if !ok {
+		return 0, syscall.EBADF
+	}
+	if !l.isDir(f.inode) {
+		return 0, syscall.ENOTDIR
+	}
+	return f.inode, nil
 }
 
 func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invocation *syscallabi.Syscall) (int, error) {
@@ -317,6 +369,9 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 
 	// just get rid of this
 	flags &= ^syscall.O_CLOEXEC
+	// There are no symbolic links, so O_NOFOLLOW changes nothing:
+	// os.RemoveAll opens directories with it.
+	flags &= ^syscall.O_NOFOLLOW
 
 	// O_DIRECTORY fails unless path is a directory. Go's os package sets it
 	// when it opens a directory to read it.
@@ -335,7 +390,7 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	// TODO: check mode
 
 	const flagSupported = os.O_RDONLY | os.O_WRONLY | os.O_RDWR |
-		os.O_CREATE | os.O_EXCL | os.O_TRUNC
+		os.O_CREATE | os.O_EXCL | os.O_TRUNC | os.O_APPEND
 
 	if flags&(^flagSupported) != 0 {
 		return 0, syscall.EINVAL // XXX?
@@ -354,7 +409,8 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 		return 0, syscall.EINVAL // XXX?
 	}
 
-	inode, err := l.machine.filesystem.OpenFile(dirInode, path, flags)
+	flagAppend := flags&os.O_APPEND != 0
+	inode, err := l.machine.filesystem.OpenFile(dirInode, path, flags&^os.O_APPEND)
 	if err != nil {
 		return 0, err
 	}
@@ -364,11 +420,12 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	// TODO: this pos is wrong for writing maybe? what should happen when you
 	// open a file that already exists and start writing to it?
 	f := &OsFile{
-		name:      path,
-		inode:     inode,
-		pos:       0,
-		flagRead:  flagRead,
-		flagWrite: flagWrite,
+		name:       path,
+		inode:      inode,
+		pos:        0,
+		flagRead:   flagRead,
+		flagWrite:  flagWrite,
+		flagAppend: flagAppend,
 	}
 
 	fd := l.allocFd()
@@ -572,14 +629,14 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 		return 0, syscall.EINVAL
 	}
 
-	if fd == syscall.Stdout || fd == syscall.Stderr {
+	if stdio, ok := l.stdioFd(fd); ok && (stdio == syscall.Stdout || stdio == syscall.Stderr) {
 		buf := make([]byte, data.Len())
 		data.Read(buf)
 
 		buf = bytes.TrimSuffix(buf, []byte("\n"))
 
 		var source string
-		if fd == syscall.Stdout {
+		if stdio == syscall.Stdout {
 			source = "stdout"
 		} else {
 			source = "stderr"
@@ -604,6 +661,13 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 			return 0, syscall.EBADFD
 		}
 
+		if f.flagAppend {
+			stat, err := l.machine.filesystem.Statfd(f.inode)
+			if err != nil {
+				return 0, syscall.EBADFD
+			}
+			f.pos = stat.Size
+		}
 		retn := l.machine.filesystem.Write(f.inode, f.pos, data)
 		f.pos += int64(retn)
 
@@ -657,6 +721,9 @@ func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView, invocation *sys
 	case *OsFile:
 		if !f.flagRead {
 			return 0, syscall.EBADFD // XXX??
+		}
+		if l.isDir(f.inode) {
+			return 0, syscall.EISDIR
 		}
 
 		retn := l.machine.filesystem.Read(f.inode, f.pos, data)
@@ -855,6 +922,9 @@ func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64
 		return 0, syscall.EBADFD // XXX??
 	}
 
+	if l.isDir(f.inode) {
+		return 0, syscall.EISDIR
+	}
 	retn := l.machine.filesystem.Read(f.inode, offset, data)
 
 	return retn, nil
@@ -954,6 +1024,15 @@ func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t],
 
 	l.logfFor(invocation, "fstat %d", fd)
 
+	if _, isStdio := l.stdioFd(fd); isStdio {
+		// The standard files are a terminal's character device, which
+		// programs check before they write colors to it.
+		var stat syscall.Stat_t
+		stat.Mode = syscall.S_IFCHR | 0o620
+		stat.Blksize = 1024
+		statBuf.Set(stat)
+		return nil
+	}
 	fdInternal, ok := l.files[fd]
 	if !ok {
 		return syscall.EBADFD
@@ -991,7 +1070,9 @@ func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueVie
 		return err
 	}
 
-	if flags != 0 {
+	// There are no symbolic links, so not following them changes nothing:
+	// os.Lstat passes AT_SYMLINK_NOFOLLOW.
+	if flags&^_AT_SYMLINK_NOFOLLOW != 0 {
 		return syscall.EINVAL // XXX?
 	}
 
@@ -1112,6 +1193,8 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 			// XXX?
 			return syscall.EBADFD
 		}
+
+	case *stdioCopy:
 
 	case *Socket:
 		// Closing a socket closes its stream or listener, so the peer
@@ -1638,6 +1721,27 @@ func (customSyscallLogger) LogExitSysGetpeername(fd int, rsa *RawSockaddrAny, ad
 	logSyscallExit("SysGetpeername", syscall, addrAttr(unsafe.Pointer(rsa), *addrlen), "err", err)
 }
 
+// stdioCopy is a copy of a standard file, which fcntl's F_DUPFD makes: it
+// writes where the original does.
+type stdioCopy struct {
+	fd int
+}
+
+// stdioFd returns the standard file that fd is or copies, if any.
+func (l *LinuxOS) stdioFd(fd int) (int, bool) {
+	if c, ok := l.files[fd].(*stdioCopy); ok {
+		return c.fd, true
+	}
+	if _, ok := l.files[fd]; !ok && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
+		return fd, true
+	}
+	return 0, false
+}
+
+// SysFcntl copies the standard files with F_DUPFD and F_DUPFD_CLOEXEC, as
+// CockroachDB's logging does to keep the original stderr, and accepts
+// F_GETFD and F_SETFD, since a machine runs no other program to inherit
+// its files. Other commands fail with ENOSYS.
 func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Syscall) (val int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -1645,7 +1749,30 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Sysc
 		return 0, syscall.EINVAL
 	}
 
-	return 0, syscall.ENOSYS
+	_, isFile := l.files[fd]
+	stdio, isStdio := l.stdioFd(fd)
+	if !isFile && !isStdio {
+		return 0, syscall.EBADF
+	}
+	switch cmd {
+	case syscall.F_DUPFD, syscall.F_DUPFD_CLOEXEC:
+		if !isStdio {
+			return 0, syscall.ENOSYS
+		}
+		if arg < 0 || arg >= maxFds {
+			return 0, syscall.EINVAL
+		}
+		newFd, ok := l.lowestFreeFd(arg)
+		if !ok {
+			return 0, syscall.EMFILE
+		}
+		l.files[newFd] = &stdioCopy{fd: stdio}
+		return newFd, nil
+	case syscall.F_GETFD, syscall.F_SETFD:
+		return 0, nil
+	default:
+		return 0, syscall.ENOSYS
+	}
 }
 
 func (l *LinuxOS) SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err error) {
@@ -1656,6 +1783,11 @@ func (l *LinuxOS) SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err
 	return nil
 }
 
+// SysFcntlFlock takes and tests POSIX record locks. A machine is one process,
+// and a process never conflicts with its own locks, while machines do not
+// share files. So every lock is granted, and F_GETLK finds no lock that
+// would block. The checks are those of Linux: the file must be open, for
+// reading to take a read lock and for writing to take a write lock.
 func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flock_t], invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -1663,7 +1795,120 @@ func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flo
 		return syscall.EINVAL
 	}
 
-	// TODO: reconsider
+	fdInternal, ok := l.files[int(fd)]
+	if !ok {
+		return syscall.EBADF
+	}
+	f, ok := fdInternal.(*OsFile)
+	if !ok {
+		return syscall.EINVAL
+	}
+
+	switch cmd {
+	case syscall.F_GETLK, syscall.F_SETLK, syscall.F_SETLKW:
+	default:
+		return syscall.EINVAL
+	}
+
+	lock := lk.Get()
+	switch lock.Type {
+	case syscall.F_RDLCK:
+		if cmd != syscall.F_GETLK && !f.flagRead {
+			return syscall.EBADF
+		}
+	case syscall.F_WRLCK:
+		if cmd != syscall.F_GETLK && !f.flagWrite {
+			return syscall.EBADF
+		}
+	case syscall.F_UNLCK:
+		if cmd == syscall.F_GETLK {
+			return syscall.EINVAL
+		}
+	default:
+		return syscall.EINVAL
+	}
+
+	if cmd == syscall.F_GETLK {
+		lock.Type = syscall.F_UNLCK
+		lk.Set(lock)
+	}
+	return nil
+}
+
+// The file system that statfs and fstatfs report: ext4's magic number, 4 KiB
+// blocks and 1 TiB, all of it free. The simulated disk has no size limit.
+const (
+	statfsMagic     = 0xef53
+	statfsBlockSize = 4096
+	statfsBlocks    = 1 << 28
+	statfsFiles     = 1 << 26
+	statfsNameLen   = 255
+)
+
+func fillStatfs(view syscallabi.ValueView[Statfs_t]) {
+	view.Set(Statfs_t{
+		Type:    statfsMagic,
+		Bsize:   statfsBlockSize,
+		Blocks:  statfsBlocks,
+		Bfree:   statfsBlocks,
+		Bavail:  statfsBlocks,
+		Files:   statfsFiles,
+		Ffree:   statfsFiles,
+		Namelen: statfsNameLen,
+		Frsize:  statfsBlockSize,
+	})
+}
+
+func (l *LinuxOS) SysStatfs(path string, buf syscallabi.ValueView[Statfs_t], invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	if _, err := l.machine.filesystem.Stat(l.workdirInode, path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		return syscall.EINVAL
+	}
+	fillStatfs(buf)
+	return nil
+}
+
+func (l *LinuxOS) SysFstatfs(fd int, buf syscallabi.ValueView[Statfs_t], invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	if _, ok := l.files[fd]; !ok {
+		return syscall.EBADF
+	}
+	fillStatfs(buf)
+	return nil
+}
+
+// SysFadvise64 accepts advice about a file's access pattern and ignores it:
+// the simulated disk has no page cache to read ahead into.
+func (l *LinuxOS) SysFadvise64(fd int, offset int64, length int64, advice int, invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	fdInternal, ok := l.files[fd]
+	if !ok {
+		return syscall.EBADF
+	}
+	if _, ok := fdInternal.(*OsFile); !ok {
+		return syscall.ESPIPE
+	}
+	if length < 0 || advice < 0 || advice > 5 {
+		return syscall.EINVAL
+	}
 	return nil
 }
 
@@ -1849,4 +2094,129 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 	delete(l.mmaps, addr)
 
 	return nil
+}
+
+// noMachineDups are the descriptors that noMachineSyscall's F_DUPFD handed
+// out in the pass outside any machine and that are not closed. gosim
+// translates this package too, so the map is made on first use: the pass
+// runs before the package's own initializers.
+var (
+	noMachineDupsMu sync.Mutex
+	noMachineDups   map[int]bool
+)
+
+// noMachineSyscall answers a system call made outside any machine. That
+// happens when gosimruntime runs every package's initializers once to set
+// the globals that machines share: the other globals it computes there are
+// thrown away, but a panic is not. Each generated caller passes the name
+// of its call when there is no machine.
+//
+// cockroachdb/ttycolor panics when it cannot stat os.Stdout, so fstat of
+// the standard files reports a terminal, as on a machine (SysFstat).
+// CockroachDB's logging copies stderr with fcntl, and close frees such a
+// copy. Initializers that make keys read random bytes, which come from the
+// run's random stream, as on a machine (SysGetrandom). Every other call
+// fails with ENOSYS.
+//
+//go:norace
+func noMachineSyscall(name string, s *syscallabi.Syscall) {
+	// The goroutine reuses its Syscall: clear what an earlier call left.
+	s.R0, s.R1 = 0, 0
+	switch name {
+	case "SysGetrandom":
+		buf := unsafe.Slice(s.Ptr0.(*byte), int(s.Int0))
+		for i := 0; i < len(buf); i += 8 {
+			var word [8]byte
+			binary.LittleEndian.PutUint64(word[:], gosimruntime.Fastrand64())
+			copy(buf[i:], word[:])
+		}
+		s.R0 = uintptr(len(buf))
+		s.Errno = 0
+		return
+	case "SysFcntl":
+		fd, cmd, arg := int(s.Int0), int(s.Int1), int(s.Int2)
+		if (cmd == syscall.F_DUPFD || cmd == syscall.F_DUPFD_CLOEXEC) && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
+			if arg < 0 || arg >= maxFds {
+				s.Errno = uintptr(syscall.EINVAL)
+				return
+			}
+			// The copy is thrown away with the pass, but the pass may compare
+			// copies: each gets its own number at or above arg.
+			noMachineDupsMu.Lock()
+			defer noMachineDupsMu.Unlock()
+			if noMachineDups == nil {
+				noMachineDups = make(map[int]bool)
+			}
+			newFd := max(arg, 100)
+			for noMachineDups[newFd] {
+				newFd++
+			}
+			if newFd >= maxFds {
+				s.Errno = uintptr(syscall.EMFILE)
+				return
+			}
+			noMachineDups[newFd] = true
+			s.R0 = uintptr(newFd)
+			s.Errno = 0
+			return
+		}
+	case "SysClose":
+		// A copy that F_DUPFD made above.
+		noMachineDupsMu.Lock()
+		defer noMachineDupsMu.Unlock()
+		if fd := int(s.Int0); noMachineDups[fd] {
+			delete(noMachineDups, fd)
+			s.Errno = 0
+			return
+		}
+	case "SysFstat":
+		if fd := int(s.Int0); fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr {
+			stat := s.Ptr1.(*Stat_t)
+			*stat = Stat_t{Mode: syscall.S_IFCHR | 0o620, Blksize: 1024}
+			s.Errno = 0
+			return
+		}
+	}
+	s.Errno = uintptr(syscall.ENOSYS)
+}
+
+// SysFchmod accepts any mode for an open file: the simulated file system
+// has no permissions, so a mode changes nothing.
+func (l *LinuxOS) SysFchmod(fd int, mode uint32, invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+	if _, ok := l.files[fd]; !ok {
+		return syscall.EBADF
+	}
+	return nil
+}
+
+// SysFchmodat accepts any mode for a file that exists, as SysFchmod does.
+func (l *LinuxOS) SysFchmodat(dirfd int, path string, mode uint32, invocation *syscallabi.Syscall) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+	dirInode, err := l.dirInodeForFd(dirfd)
+	if err != nil {
+		return err
+	}
+	if _, err := l.machine.filesystem.Stat(dirInode, path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		return syscall.EINVAL
+	}
+	return nil
+}
+
+// isDir reports whether the open inode is a directory, which read fails
+// on with EISDIR.
+func (l *LinuxOS) isDir(inode int) bool {
+	stat, err := l.machine.filesystem.Statfd(inode)
+	return err == nil && stat.IsDir
 }

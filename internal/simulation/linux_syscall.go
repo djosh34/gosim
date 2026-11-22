@@ -27,7 +27,11 @@ func SyscallSysFcntlFlock(fd uintptr, cmd int, lk *Flock_t) (err error) {
 	syscall.Int0 = uintptr(fd)
 	syscall.Int1 = uintptr(cmd)
 	syscall.Ptr2 = lk
-	linuxOS.dispatchSyscall(syscall)
+	if linuxOS == nil {
+		noMachineSyscall("SysFcntlFlock", syscall)
+	} else {
+		linuxOS.dispatchSyscall(syscall)
+	}
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr2 = nil
 	return

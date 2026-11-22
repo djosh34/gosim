@@ -15,6 +15,52 @@ func (t *packageTranslator) rewriteGo(c *dstutil.Cursor) {
 	if goStmt, ok := c.Node().(*dst.GoStmt); ok {
 		var fun dst.Expr
 
+		if t.isNamedBuiltIn(goStmt.Call.Fun, "panic") || t.isNamedBuiltIn(goStmt.Call.Fun, "print") || t.isNamedBuiltIn(goStmt.Call.Fun, "println") {
+			// go panic(x): a builtin is not a value to bind. The arguments
+			// are evaluated now, as go does, and passed to a function that
+			// returns the goroutine's body.
+			var params []*dst.Field
+			var names []dst.Expr
+			for i, arg := range goStmt.Call.Args {
+				var typExpr dst.Expr = &dst.InterfaceType{Methods: &dst.FieldList{}}
+				if typ, ok := t.getType(arg); ok {
+					typExpr = t.makeTypeExpr(types.Default(typ))
+				}
+				name := fmt.Sprintf("arg%d%s", i, t.suffix())
+				params = append(params, &dst.Field{Names: []*dst.Ident{dst.NewIdent(name)}, Type: typExpr})
+				names = append(names, dst.NewIdent(name))
+			}
+			body := &dst.FuncLit{
+				Type: &dst.FuncType{Params: &dst.FieldList{}},
+				Body: &dst.BlockStmt{List: []dst.Stmt{&dst.ExprStmt{X: &dst.CallExpr{
+					Fun:      dst.NewIdent(goStmt.Call.Fun.(*dst.Ident).Name),
+					Args:     names,
+					Ellipsis: goStmt.Call.Ellipsis,
+				}}}},
+			}
+			var args []dst.Expr
+			for _, arg := range goStmt.Call.Args {
+				args = append(args, t.apply(arg).(dst.Expr))
+			}
+			fun = &dst.CallExpr{
+				Fun: &dst.FuncLit{
+					Type: &dst.FuncType{
+						Params:  &dst.FieldList{List: params},
+						Results: &dst.FieldList{List: []*dst.Field{{Type: &dst.FuncType{Params: &dst.FieldList{}}}}},
+					},
+					Body: &dst.BlockStmt{List: []dst.Stmt{&dst.ReturnStmt{Results: []dst.Expr{body}}}},
+				},
+				Args: args,
+			}
+			c.Replace(&dst.ExprStmt{
+				X: &dst.CallExpr{
+					Fun:  t.newRuntimeSelector("Go"),
+					Args: []dst.Expr{fun},
+				},
+			})
+			return
+		}
+
 		funcType, ok := t.getType(goStmt.Call.Fun)
 		if !ok {
 			panic("help")

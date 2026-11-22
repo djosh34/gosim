@@ -52,6 +52,12 @@ func NewMap[K comparable, V any]() Map[K, V] {
 	}
 }
 
+// NewMapSized is NewMap for make(map[K]V, size). The size is evaluated, as
+// make does, but the map does not use it.
+func NewMapSized[K comparable, V any](size int) Map[K, V] {
+	return NewMap[K, V]()
+}
+
 func NilMap[K comparable, V any]() Map[K, V] {
 	return Map[K, V]{}
 }
@@ -444,7 +450,13 @@ func (m *mapImpl[K, V]) UnsafePointer() unsafe.Pointer {
 	return unsafe.Pointer(m)
 }
 
+// SetIndex sets the key to value, or deletes the key if value is the zero
+// Value, as reflect.Value.SetMapIndex does.
 func (m *mapImpl[K, V]) SetIndex(key, value reflect.Value) {
+	if !value.IsValid() {
+		m.outer().Delete(key.Interface().(K))
+		return
+	}
 	m.outer().Set(key.Interface().(K), value.Interface().(V))
 }
 

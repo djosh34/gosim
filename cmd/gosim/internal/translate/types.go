@@ -8,6 +8,9 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/dave/dst"
 	"golang.org/x/tools/go/ast/astutil"
@@ -55,7 +58,7 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
 			if slices.Index(PublicExportHacks[path], id.Name) == -1 {
-				log.Fatalf("need public export hack for %s.%s", path, id.Name)
+				t.addExportHack(path, id.Name, false)
 			}
 			id.Name = "GosimPublicExportHack" + id.Name
 		}
@@ -94,12 +97,15 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		if id.Path != "" && id.Path != t.pkgPath && !token.IsExported(id.Name) {
 			// bad news bears here...
 			if slices.Index(PublicExportHacks[path], id.Name) == -1 {
-				log.Fatalf("need public export hack for %s.%s", path, id.Name)
+				t.addExportHack(path, id.Name, false)
 			}
 			id.Name = "GosimPublicExportHack" + id.Name
 		}
 
-		res := dst.Expr(id)
+		var res dst.Expr = id
+		if typ.TypeArgs() == nil {
+			res = t.unshadow(typ.Obj(), id)
+		}
 		if typ.TypeArgs() != nil {
 			var args []dst.Expr
 			for i := 0; i < typ.TypeArgs().Len(); i++ {
@@ -448,6 +454,18 @@ func (b *implicitConversionsBuilder) before(c *astutil.Cursor) bool {
 			}
 		}
 
+	case *ast.ValueSpec:
+		// var x T = v converts v to T.
+		if node.Type == nil || len(node.Names) != len(node.Values) {
+			break
+		}
+		to := b.typesInfo.TypeOf(node.Type)
+		for _, v := range node.Values {
+			if from := b.typesInfo.TypeOf(v); to != nil && from != nil && !types.Identical(to, from) {
+				b.conversions[v] = to
+			}
+		}
+
 	case *ast.SendStmt:
 		// xxx: this can happen if we have a call
 
@@ -510,4 +528,57 @@ func (b *implicitConversionsBuilder) after(c *astutil.Cursor) bool {
 		b.cursig = b.sigstack[len(b.sigstack)-1]
 	}
 	return true
+}
+
+// unshadow returns the identifier id of the type obj, or the name of an
+// alias of it where a local declaration hides the name that id uses at the
+// node being translated: a parameter named like the type's package, as in
+// func f(types map[string]*types.T), or like the type itself. The alias
+// is declared at the package level, where nothing hides the name. Using
+// the alias where nothing hides the name is harmless.
+func (t *packageTranslator) unshadow(obj *types.TypeName, id *dst.Ident) dst.Expr {
+	if t.curPos == token.NoPos || t.pkgTypes == nil || obj.Pkg() == nil {
+		return id
+	}
+	scope := t.pkgTypes.Scope().Innermost(t.curPos)
+	if scope == nil {
+		return id
+	}
+	test := t.forTest || strings.HasSuffix(t.pkgPath, "_test")
+	// A name that nothing declares at the node, as when the node is in
+	// another file than the one being written, is not hidden either.
+	if obj.Pkg() == t.pkgTypes {
+		if _, found := scope.LookupParent(obj.Name(), t.curPos); found != nil && found != obj {
+			return dst.NewIdent(t.addExportHack(t.pkgPath, id.Name, test))
+		}
+		return id
+	}
+	_, found := scope.LookupParent(obj.Pkg().Name(), t.curPos)
+	if _, isPkg := found.(*types.PkgName); isPkg || found == nil {
+		return id
+	}
+	// The package's path, not its name, which two packages can share.
+	alias := "GosimAlias" + identFromPath(obj.Pkg().Path()) + "_" + id.Name
+	if t.localAliases == nil {
+		t.localAliases = make(map[string]*dst.Ident)
+	}
+	t.localAliases[alias] = &dst.Ident{Name: id.Name, Path: id.Path}
+	return dst.NewIdent(alias)
+}
+
+// identFromPath encodes a package path as a part of an identifier, one
+// that no other path gives: the length of the encoding, an underscore,
+// then the path with every byte that is not a letter or digit written as
+// _XX, its value in hex.
+func identFromPath(path string) string {
+	var b strings.Builder
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		if c < utf8.RuneSelf && (unicode.IsLetter(rune(c)) || unicode.IsDigit(rune(c))) {
+			b.WriteByte(c)
+		} else {
+			fmt.Fprintf(&b, "_%02x", c)
+		}
+	}
+	return fmt.Sprintf("%d_%s", b.Len(), b.String())
 }

@@ -19,3 +19,9 @@ func InternalSyscallUnix_Unlinkat(dirfd int, path string, flags int) error {
 func InternalSyscallUnix_Openat(dirfd int, path string, flags int, perm uint32) (int, error) {
 	return Syscall_openat(dirfd, path, flags, perm)
 }
+
+// InternalSyscallUnix_Fstatat stats path relative to the directory dirfd,
+// as os.File.ReadDir does for each entry.
+func InternalSyscallUnix_Fstatat(dirfd int, path string, stat *syscall.Stat_t, flags int) error {
+	return Syscall_fstatat(dirfd, path, stat, flags)
+}

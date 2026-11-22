@@ -193,11 +193,15 @@ var filterCommon = []string{
 	"SYS_CHDIR",
 	"SYS_CLOSE",
 	"SYS_CONNECT",
+	"SYS_FADVISE64",
 	"SYS_FALLOCATE",
+	"SYS_FCHMOD",
+	"SYS_FCHMODAT",
 	"SYS_FCNTL",
 	"SYS_FDATASYNC",
 	"SYS_FLOCK",
 	"SYS_FSTAT",
+	"SYS_FSTATFS",
 	"SYS_FSYNC",
 	"SYS_FTRUNCATE",
 	"SYS_GETCWD",
@@ -220,6 +224,7 @@ var filterCommon = []string{
 	"SYS_RENAMEAT",
 	"SYS_SETSOCKOPT",
 	"SYS_SOCKET",
+	"SYS_STATFS",
 	"SYS_UNAME",
 	"SYS_UNLINKAT",
 	"SYS_WRITE",
@@ -350,6 +355,7 @@ var typemap = map[string]string{
 	"RawSockaddrAny": "RawSockaddrAny",
 	"Utsname":        "Utsname",
 	"Stat_t":         "Stat_t",
+	"Statfs_t":       "Statfs_t",
 	"_Socklen":       "Socklen",
 }
 
@@ -592,7 +598,7 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 			fmt.Sprintf("\tsyscall.OS = %s\n", osImplName) +
 			prepareCaller +
 			invokeLog +
-			fmt.Sprintf("\t%s.dispatchSyscall(syscall)\n", osImplName) +
+			fmt.Sprintf("\tif %s == nil {\n\t\tnoMachineSyscall(%q, syscall)\n\t} else {\n\t\t%s.dispatchSyscall(syscall)\n\t}\n", osImplName, ifaceName, osImplName) +
 			parseCallerText +
 			retLog +
 			cleanupCallerText +
@@ -658,11 +664,7 @@ var _ %s = &%s{}
 
 //go:norace
 func (os *%s) dispatchSyscall(s *syscallabi.Syscall) {
-	// XXX: help this happens for globals in os
-	if os == nil {
-		s.Errno = uintptr(syscall.ENOSYS)
-		return
-	}
+	// The callers handle a call outside any machine (noMachineSyscall).
 	os.dispatcher.Dispatch(s)
 }
 
