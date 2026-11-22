@@ -685,3 +685,33 @@ func TestFoldKeepsInit(t *testing.T) {
 		t.Errorf("got len %d, initdep initialized %v", lenInitDep, initflag.Set)
 	}
 }
+
+// TestExistsErrors makes a file with O_EXCL and a directory that already
+// exist: both fail with EEXIST, as on Linux, and the run goes on.
+func TestExistsErrors(t *testing.T) {
+	f, err := os.OpenFile("exists", os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.OpenFile("exists", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644); !errors.Is(err, os.ErrExist) {
+		t.Errorf("O_EXCL of an existing file: got %v, want EEXIST", err)
+	}
+	if err := os.Mkdir("existsdir", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir("existsdir", 0o755); !errors.Is(err, os.ErrExist) {
+		t.Errorf("mkdir of an existing directory: got %v, want EEXIST", err)
+	}
+	if gosim.IsSim() {
+		return
+	}
+	if err := os.Remove("exists"); err != nil {
+		t.Error(err)
+	}
+	if err := os.Remove("existsdir"); err != nil {
+		t.Error(err)
+	}
+}
