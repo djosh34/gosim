@@ -512,6 +512,10 @@ type packageTranslator struct {
 	globalInfo *GlobalInfo
 
 	needsUnsafe bool
+	// foldedImports are the packages that rewriteConstantLen removed a
+	// reference to, by path; each gets a blank import, so that its
+	// initializers still run if that was its last reference.
+	foldedImports map[string]bool
 
 	unimplemented []gosimtool.UnimplementedHook
 
@@ -731,6 +735,7 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 	}
 
 	t.needsUnsafe = false
+	t.foldedImports = nil
 
 	// in a first pass, rewrite all select stmts. unclear if this is necessary,
 	// but trying to do it preApply didn't translate inner nested selects.
@@ -746,39 +751,36 @@ func (t *packageTranslator) translateFile(dstFile *dst.File) (*dst.File, error) 
 	t.collectUnimplemented(dstFile)
 
 	if t.needsUnsafe {
-		var importDecl *dst.GenDecl
-
-		for _, decl := range dstFile.Decls {
-			genDecl, ok := decl.(*dst.GenDecl)
-			if !ok {
-				continue
-			}
-
-			if genDecl.Tok != token.IMPORT {
-				continue
-			}
-
-			importDecl = genDecl
+		addBlankImport(dstFile, "unsafe")
+	}
+	for _, path := range slices.Sorted(maps.Keys(t.foldedImports)) {
+		if replaced, ok := t.replacedPkgs[path]; ok {
+			path = replaced
 		}
-
-		// TODO: do this earlier, messes up comments
-		if t.needsUnsafe {
-			if importDecl == nil {
-				importDecl = &dst.GenDecl{
-					Tok: token.IMPORT,
-				}
-				dstFile.Decls = append([]dst.Decl{importDecl}, dstFile.Decls...)
-			}
-			importDecl.Specs = append(importDecl.Specs,
-				&dst.ImportSpec{
-					Name: dst.NewIdent("_"),
-					Path: &dst.BasicLit{Kind: token.STRING, Value: strconv.Quote("unsafe")},
-				},
-			)
-		}
+		addBlankImport(dstFile, path)
 	}
 
 	return dstFile, nil
+}
+
+// addBlankImport adds import _ "path" to the file's last import
+// declaration, or to a new one.
+func addBlankImport(file *dst.File, path string) {
+	var importDecl *dst.GenDecl
+	for _, decl := range file.Decls {
+		if genDecl, ok := decl.(*dst.GenDecl); ok && genDecl.Tok == token.IMPORT {
+			importDecl = genDecl
+		}
+	}
+	// TODO: do this earlier, messes up comments
+	if importDecl == nil {
+		importDecl = &dst.GenDecl{Tok: token.IMPORT}
+		file.Decls = append([]dst.Decl{importDecl}, file.Decls...)
+	}
+	importDecl.Specs = append(importDecl.Specs, &dst.ImportSpec{
+		Name: dst.NewIdent("_"),
+		Path: &dst.BasicLit{Kind: token.STRING, Value: strconv.Quote(path)},
+	})
 }
 
 // collectUnimplemented records every function that calls

@@ -418,6 +418,9 @@ func isStdPackage(pkgPath string) bool {
 // evaluated, and could panic, and an array length or a const declaration
 // would not compile.
 //
+// A package that x names gets a blank import (foldedImports), which keeps
+// its initializers running if x held its last reference.
+//
 // The constant is len([N]struct{}{}), with the call's own builtin, len or
 // cap, which resolves to the builtin here and names nothing a local could
 // hide. The local variables that x uses stay used, in a term that is zero
@@ -439,6 +442,18 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	if !becomesCall {
 		return
 	}
+	// The packages the operand names may have no other reference left.
+	ast.Inspect(astCall.Args[0], func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok {
+			if pkg, ok := t.typesInfo.Uses[id].(*types.PkgName); ok {
+				if t.foldedImports == nil {
+					t.foldedImports = make(map[string]bool)
+				}
+				t.foldedImports[pkg.Imported().Path()] = true
+			}
+		}
+		return true
+	})
 	builtin := call.Fun.(*dst.Ident).Name
 	array := func(n string, elt dst.Expr, elts []dst.Expr) dst.Expr {
 		return &dst.CallExpr{

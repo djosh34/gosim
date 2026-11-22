@@ -19,6 +19,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/jellevandenhooff/gosim/internal/tests/behavior/initdep"
+	"github.com/jellevandenhooff/gosim/internal/tests/behavior/initflag"
+
 	"github.com/jellevandenhooff/gosim"
 )
 
@@ -641,7 +644,7 @@ func dupInInit() []int {
 		panic(fmt.Sprintf("closing a dup in an initializer: %v", err))
 	}
 	c, errC := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 3)
-	if errC != nil || c == b {
+	if errC != nil || c != a {
 		panic(fmt.Sprintf("dup after close in an initializer: %d, %v", c, errC))
 	}
 	// Leave no copy open, for TestDupMinimum.
@@ -653,5 +656,16 @@ func dupInInit() []int {
 func TestDupInInit(t *testing.T) {
 	if len(initDups) != 3 {
 		t.Errorf("got %v", initDups)
+	}
+}
+
+// lenInitDep is the only reference to package initdep, whose initializer
+// sets initflag.Set. Translation folds the len away; the package must still
+// be initialized.
+const lenInitDep = len([1]*initdep.T{nil})
+
+func TestFoldKeepsInit(t *testing.T) {
+	if lenInitDep != 1 || !initflag.Set {
+		t.Errorf("got len %d, initdep initialized %v", lenInitDep, initflag.Set)
 	}
 }
