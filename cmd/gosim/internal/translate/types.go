@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/dave/dst"
 	"golang.org/x/tools/go/ast/astutil"
@@ -557,7 +558,7 @@ func (t *packageTranslator) unshadow(obj *types.TypeName, id *dst.Ident) dst.Exp
 		return id
 	}
 	// The package's path, not its name, which two packages can share.
-	alias := "GosimAlias_" + identFromPath(obj.Pkg().Path()) + "_" + id.Name
+	alias := "GosimAlias" + identFromPath(obj.Pkg().Path()) + "_" + id.Name
 	if t.localAliases == nil {
 		t.localAliases = make(map[string]*dst.Ident)
 	}
@@ -565,13 +566,19 @@ func (t *packageTranslator) unshadow(obj *types.TypeName, id *dst.Ident) dst.Exp
 	return dst.NewIdent(alias)
 }
 
-// identFromPath turns a package path into a part of an identifier: every
-// character that is not a letter or digit becomes an underscore.
+// identFromPath encodes a package path as a part of an identifier, one
+// that no other path gives: the length of the encoding, an underscore,
+// then the path with every byte that is not a letter or digit written as
+// _XX, its value in hex.
 func identFromPath(path string) string {
-	return strings.Map(func(r rune) rune {
-		if r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) {
-			return r
+	var b strings.Builder
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		if c < utf8.RuneSelf && (unicode.IsLetter(rune(c)) || unicode.IsDigit(rune(c))) {
+			b.WriteByte(c)
+		} else {
+			fmt.Fprintf(&b, "_%02x", c)
 		}
-		return '_'
-	}, path)
+	}
+	return fmt.Sprintf("%d_%s", b.Len(), b.String())
 }

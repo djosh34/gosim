@@ -166,15 +166,35 @@ func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err sysc
 	if IsHandledSyscall(trap) {
 		// A syscall the simulation handles arrives here raw, from code
 		// that calls RawSyscall6 itself rather than through package
-		// syscall's wrappers, which gosim renames. The run ends, as at an
-		// unimplemented hook.
-		gosimruntime.Unimplemented("raw syscall " + SyscallName(trap))
+		// syscall's wrappers, which gosim renames. It fails with ENOSYS,
+		// as any syscall the simulation does not handle, for the caller
+		// to deal with.
+		logf("raw syscall %s (%d), which the simulation handles only through package syscall", SyscallName(trap), trap)
 		return 0, 0, syscall.ENOSYS
 	}
 
 	logf("unsupported syscall %s (%d) %d %d %d %d %d %d", SyscallName(trap), trap, a1, a2, a3, a4, a5, a6)
 
 	return 0, 0, syscall.ENOSYS
+}
+
+// maxFds is the limit of a machine's file descriptors, Linux's default hard
+// limit of open files.
+const maxFds = 1 << 20
+
+// lowestFreeFd takes the lowest free file descriptor at or above min, as
+// F_DUPFD does, for min below maxFds. allocFd hands out the descriptors
+// from nextFd up, which starts at 5, so the free ones below nextFd are
+// those closed since, from 5 up; 0 to 2 are the standard files'.
+func (l *LinuxOS) lowestFreeFd(min int) int {
+	fd := max(min, 5)
+	for ; fd < l.nextFd; fd++ {
+		if _, ok := l.files[fd]; !ok {
+			return fd
+		}
+	}
+	l.nextFd = fd
+	return l.allocFd()
 }
 
 func (l *LinuxOS) allocFd() int {
@@ -1724,14 +1744,10 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Sysc
 		if !isStdio {
 			return 0, syscall.ENOSYS
 		}
-		// The new descriptor is the lowest free one at or above arg. File
-		// descriptors are never reused, so that is arg itself if it is
-		// above every one handed out, or the next one.
-		if arg < 0 {
+		if arg < 0 || arg >= maxFds {
 			return 0, syscall.EINVAL
 		}
-		l.nextFd = max(l.nextFd, arg)
-		newFd := l.allocFd()
+		newFd := l.lowestFreeFd(arg)
 		l.files[newFd] = &stdioCopy{fd: stdio}
 		return newFd, nil
 	case syscall.F_GETFD, syscall.F_SETFD:
@@ -2090,10 +2106,15 @@ func noMachineSyscall(name string, s *syscallabi.Syscall) {
 		s.Errno = 0
 		return
 	case "SysFcntl":
-		fd, cmd := int(s.Int0), int(s.Int1)
+		fd, cmd, arg := int(s.Int0), int(s.Int1), int(s.Int2)
 		if (cmd == syscall.F_DUPFD || cmd == syscall.F_DUPFD_CLOEXEC) && (fd == syscall.Stdin || fd == syscall.Stdout || fd == syscall.Stderr) {
-			// The copy is thrown away with the pass; any number will do.
-			s.R0 = uintptr(100 + fd)
+			if arg < 0 || arg >= maxFds {
+				s.Errno = uintptr(syscall.EINVAL)
+				return
+			}
+			// The copy is thrown away with the pass; any number at or
+			// above arg will do.
+			s.R0 = uintptr(max(arg, 100))
 			s.Errno = 0
 			return
 		}

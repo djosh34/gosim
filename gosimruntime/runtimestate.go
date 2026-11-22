@@ -95,9 +95,9 @@ func ReadMetrics(samples []metrics.Sample) {
 // formats the calling goroutine's stack as the real runtime does, with what
 // differs between two runs of a seed taken out: the goroutine's number is
 // its number in the simulation, a frame's arguments read "...", and a
-// "created by" line does not name the creating goroutine. With all set it
-// still formats only the calling goroutine: the other simulated goroutines'
-// stacks are not the real runtime's to report.
+// "created by" line does not name the creating goroutine. With all set,
+// the stacks of the other goroutines of the caller's machine follow, by
+// number, each frame a function and its file and line.
 //
 //go:noinline
 func Stack(buf []byte, all bool) int {
@@ -110,7 +110,52 @@ func Stack(buf []byte, all bool) int {
 		}
 		tmp = make([]byte, 2*len(tmp))
 	}
-	return copy(buf, simStack(tmp, goroutineID(getg())))
+	g := getg()
+	out := simStack(tmp, goroutineID(g))
+	if all {
+		for _, id := range machineGoroutines(g) {
+			out = append(out, '\n')
+			out = appendGoroutineStack(out, id)
+		}
+	}
+	return copy(buf, out)
+}
+
+// machineGoroutines returns the numbers of the goroutines of g's machine
+// other than g, in order.
+func machineGoroutines(g *goroutine) []int {
+	var ids []int
+	race.Release(unsafe.Pointer(&ids))
+	g.upcall(func() {
+		race.Acquire(unsafe.Pointer(&ids))
+		for _, other := range gs.get().goroutines {
+			if other.machine == g.machine && other != g {
+				ids = append(ids, other.ID)
+			}
+		}
+		race.Release(unsafe.Pointer(&ids))
+	})
+	race.Acquire(unsafe.Pointer(&ids))
+	slices.Sort(ids)
+	return ids
+}
+
+// appendGoroutineStack appends the stack of the goroutine numbered id, as
+// GetStacktraceFor captures it.
+func appendGoroutineStack(out []byte, id int) []byte {
+	pcs := make([]uintptr, 128)
+	n := GetStacktraceFor(id, pcs)
+	out = fmt.Appendf(out, "goroutine %d [waiting]:\n", id)
+	frames := runtime.CallersFrames(pcs[:n])
+	for {
+		f, more := frames.Next()
+		if f.Function != "" {
+			out = fmt.Appendf(out, "%s(...)\n\t%s:%d\n", f.Function, f.File, f.Line)
+		}
+		if !more {
+			return out
+		}
+	}
 }
 
 // goroutineID returns g's number in the simulation. The scheduler sets it

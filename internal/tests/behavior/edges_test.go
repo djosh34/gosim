@@ -79,7 +79,8 @@ func TestBigIntRand(t *testing.T) {
 	}
 	if v := new(big.Int).Rand(r, big.NewInt(0)); v.Sign() != 0 {
 		t.Errorf("Rand with n = 0 got %v", v)
-	} // The receiver is the bound.
+	}
+	// The receiver is the bound.
 	m := big.NewInt(1000)
 	m.Rand(r, m)
 	if m.Sign() < 0 || m.Cmp(n) >= 0 {
@@ -454,12 +455,32 @@ func localLen() int {
 	return len(a)
 }
 
-// TestLocalConstantLen takes len of local arrays, which stays as written.
+// lenOfMapLiteral is constant, though translation turns the map literal
+// into a call.
+const lenOfMapLiteral = len([1]map[int]int{{}})
+
+// lenWithLocal takes len of an array of a global and a local.
+func lenWithLocal() int {
+	v := 7
+	return len([2]int{globalOpts["a"], v})
+}
+
+// lenUnderLocalInt takes len of a global array where a local hides int.
+func lenUnderLocalInt() int {
+	int := 3
+	return len(lenSlots) + int
+}
+
+// TestLocalConstantLen takes len of local arrays, which stays as written,
+// and the cases around it.
 func TestLocalConstantLen(t *testing.T) {
 	a := [3]int{1, 2, 3}
 	var b [len(a)]int
 	if localLen() != 4 || len(b) != 3 {
 		t.Errorf("got %d and %d", localLen(), len(b))
+	}
+	if lenOfMapLiteral != 1 || lenWithLocal() != 2 || lenUnderLocalInt() != 8 {
+		t.Errorf("got %d, %d, %d", lenOfMapLiteral, lenWithLocal(), lenUnderLocalInt())
 	}
 }
 
@@ -473,7 +494,19 @@ func TestDupMinimum(t *testing.T) {
 	if fd < 100 {
 		t.Errorf("got descriptor %d, below 100", fd)
 	}
-	if _, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, -1); err != unix.EINVAL {
-		t.Errorf("a negative minimum: got %v, want EINVAL", err)
+	// The lowest free descriptor at or above the minimum, below one
+	// handed out before.
+	fd2, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unix.Close(fd2)
+	if fd2 < 10 || fd2 >= 100 || gosim.IsSim() && fd2 != 10 {
+		t.Errorf("minimum 10 after 100: got descriptor %d", fd2)
+	}
+	for _, min := range []int{-1, 1 << 30} {
+		if _, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, min); err != unix.EINVAL {
+			t.Errorf("minimum %d: got %v, want EINVAL", min, err)
+		}
 	}
 }

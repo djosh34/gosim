@@ -2,6 +2,7 @@ package translate
 
 import (
 	"fmt"
+	"go/token"
 	"go/types"
 	"maps"
 	"os"
@@ -187,5 +188,28 @@ func TestRuntimeLinknameHooks(t *testing.T) {
 				t.Errorf("%s: hook %s for %s.%s has signature\n\t%s\nwant\n\t%s", goarch, name, linked.Pkg, linked.Selector, got, want)
 			}
 		}
+	}
+}
+
+// TestIdentFromPath checks that paths that differ give aliases that differ.
+func TestIdentFromPath(t *testing.T) {
+	seen := make(map[string]string)
+	for _, p := range []struct{ path, name string }{
+		{"a/foo-bar", "T"},
+		{"a/foo_bar", "T"},
+		{"a/foo.bar", "T"},
+		{"a/foo_2dbar", "T"},
+		{"a", "b_T"},
+		{"a_b", "T"},
+		{"strings", "Builder"},
+	} {
+		alias := "GosimAlias" + identFromPath(p.path) + "_" + p.name
+		if !token.IsIdentifier(alias) {
+			t.Errorf("%s.%s: %q is not an identifier", p.path, p.name, alias)
+		}
+		if other, ok := seen[alias]; ok {
+			t.Errorf("%s.%s and %s give the same alias %q", p.path, p.name, other, alias)
+		}
+		seen[alias] = p.path + "." + p.name
 	}
 }

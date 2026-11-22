@@ -410,45 +410,78 @@ func isStdPackage(pkgPath string) bool {
 }
 
 // rewriteConstantLen replaces len(x) and cap(x) that are constants, as for
-// an array x, with their value as an int constant, when x names a
-// package-level variable. gosim moves such a variable into the package's
-// globals, and len of the moved variable is no longer a constant, which an
-// array length needs. Go does not evaluate x in such a call, so nothing is
-// lost. Any other x stays: folding it could remove a local's only use.
+// an array x, with a constant that translation keeps constant, where
+// translation would make x non-constant: when x names a package-level
+// variable, which gosim moves into the package's globals, or holds a map
+// literal or map index, which become calls. An array length or a const
+// declaration needs the constant. Go does not evaluate x in such a call,
+// so nothing is lost, except where x uses a local variable: folding would
+// leave the local unused, so such an x stays.
+//
+// The constant is len([N]struct{}{}), which is of type int, as len(x) is,
+// and names nothing that a local declaration could hide: len resolves to
+// the builtin here, since the call being replaced uses it.
 func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	call, ok := c.Node().(*dst.CallExpr)
 	if !ok || !(t.isNamedBuiltIn(call.Fun, "len") || t.isNamedBuiltIn(call.Fun, "cap")) {
 		return
 	}
-	astCall, ok := t.astMap.Nodes[call].(ast.Expr)
+	astCall, ok := t.astMap.Nodes[call].(*ast.CallExpr)
 	if !ok {
 		return
 	}
 	tv, ok := t.typesInfo.Types[astCall]
-	if !ok || tv.Value == nil || !t.namesGlobal(astCall.(*ast.CallExpr).Args[0]) {
+	if !ok || tv.Value == nil {
 		return
 	}
-	// int(N), not N: len and cap are of type int, and an untyped N would
-	// change what an expression such as len(x)/2.0 computes.
+	if becomesCall, usesLocal := t.lenOperand(astCall.Args[0]); !becomesCall || usesLocal {
+		return
+	}
 	c.Replace(&dst.CallExpr{
-		Fun:  dst.NewIdent("int"),
-		Args: []dst.Expr{&dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString()}},
+		Fun: dst.NewIdent("len"),
+		Args: []dst.Expr{&dst.CompositeLit{
+			Type: &dst.ArrayType{
+				Len: &dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString()},
+				Elt: &dst.StructType{Fields: &dst.FieldList{}},
+			},
+		}},
 		Decs: dst.CallExprDecorations{NodeDecs: call.Decs.NodeDecs},
 	})
 }
 
-// namesGlobal reports whether expr names a package-level variable.
-func (t *packageTranslator) namesGlobal(expr ast.Expr) bool {
-	found := false
+// lenOperand reports whether translation makes expr non-constant, as
+// rewriteConstantLen describes, and whether expr uses a local variable.
+func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall, usesLocal bool) {
+	isMap := func(e ast.Expr) bool {
+		typ := t.typesInfo.TypeOf(e)
+		if typ == nil {
+			return false
+		}
+		_, ok := typ.Underlying().(*types.Map)
+		return ok
+	}
 	ast.Inspect(expr, func(n ast.Node) bool {
-		if id, ok := n.(*ast.Ident); ok {
-			if v, ok := t.typesInfo.Uses[id].(*types.Var); ok && v.Pkg() != nil && v.Parent() == v.Pkg().Scope() {
-				found = true
+		switch n := n.(type) {
+		case *ast.Ident:
+			if v, ok := t.typesInfo.Uses[n].(*types.Var); ok && !v.IsField() && v.Pkg() != nil {
+				if v.Parent() == v.Pkg().Scope() {
+					becomesCall = true
+				} else {
+					usesLocal = true
+				}
+			}
+		case *ast.CompositeLit:
+			if isMap(n) {
+				becomesCall = true
+			}
+		case *ast.IndexExpr:
+			if isMap(n.X) {
+				becomesCall = true
 			}
 		}
-		return !found
+		return true
 	})
-	return found
+	return becomesCall, usesLocal
 }
 
 // rewriteEmbedFS wraps an embed.FS that is converted to an interface of

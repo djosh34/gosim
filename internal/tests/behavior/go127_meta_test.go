@@ -159,13 +159,3 @@ func TestPanicLog(t *testing.T) {
 		t.Errorf("two runs of a panic gave different checksums")
 	}
 }
-
-func TestRawHandledSyscall(t *testing.T) {
-	run, err := metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestRawHandledSyscall", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "unimplemented hook: raw syscall SYS_FCHMOD"; !run.Failed || run.Err != want {
-		t.Errorf("got failed %v, err %q; want err %q", run.Failed, run.Err, want)
-	}
-}
