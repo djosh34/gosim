@@ -488,13 +488,22 @@ func TestLocalConstantLen(t *testing.T) {
 	}
 }
 
+// closeFd closes a descriptor a test dup'ed and fails the test if that
+// fails.
+func closeFd(t *testing.T, fd int) {
+	t.Helper()
+	if err := unix.Close(fd); err != nil {
+		t.Errorf("closing %d: %v", fd, err)
+	}
+}
+
 // TestDupMinimum dups a standard file to a descriptor at or above 100.
 func TestDupMinimum(t *testing.T) {
 	fd, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer unix.Close(fd)
+	defer closeFd(t, fd)
 	if fd < 100 {
 		t.Errorf("got descriptor %d, below 100", fd)
 	}
@@ -504,7 +513,7 @@ func TestDupMinimum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer unix.Close(fd2)
+	defer closeFd(t, fd2)
 	if fd2 < 10 || fd2 >= 100 || gosim.IsSim() && fd2 != 10 {
 		t.Errorf("minimum 10 after 100: got descriptor %d", fd2)
 	}
@@ -522,12 +531,12 @@ func TestDupMinimum(t *testing.T) {
 	if err != nil || fd3 != 3 {
 		t.Errorf("minimum 3: got %d, %v", fd3, err)
 	}
-	defer unix.Close(fd3)
+	defer closeFd(t, fd3)
 	last, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 1<<20-1)
 	if err != nil || last != 1<<20-1 {
 		t.Errorf("minimum 2^20-1: got %d, %v", last, err)
 	}
-	defer unix.Close(last)
+	defer closeFd(t, last)
 	if fd, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 1<<20-1); err != unix.EMFILE {
 		t.Errorf("minimum 2^20-1 again: got %d, %v; want EMFILE", fd, err)
 	}
@@ -536,14 +545,16 @@ func TestDupMinimum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unix.Close(dup)
+	closeFd(t, dup)
 	for range 50 {
 		g, err := os.OpenFile("dup2", os.O_CREATE|os.O_RDWR, 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}
 		got := int(g.Fd())
-		g.Close()
+		if err := g.Close(); err != nil {
+			t.Fatal(err)
+		}
 		if got == dup {
 			t.Fatalf("an open got %d, a closed dup's descriptor", dup)
 		}
@@ -648,8 +659,11 @@ func dupInInit() []int {
 		panic(fmt.Sprintf("dup after close in an initializer: %d, %v", c, errC))
 	}
 	// Leave no copy open, for TestDupMinimum.
-	unix.Close(b)
-	unix.Close(c)
+	for _, fd := range []int{b, c} {
+		if err := unix.Close(fd); err != nil {
+			panic(fmt.Sprintf("closing a dup in an initializer: %v", err))
+		}
+	}
 	return []int{a, b, c}
 }
 
