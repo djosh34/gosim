@@ -627,8 +627,8 @@ func TestConstantLenOperands(t *testing.T) {
 
 // initDups copies stdout and stderr in an initializer, as CockroachDB's
 // logging does, closes one copy and copies again, then closes the rest.
-// gosim runs initializers
-// once outside any machine too, where a panic here ends the run.
+// gosim runs initializers once outside any machine too, where a panic here
+// ends the run.
 var initDups = dupInInit()
 
 func dupInInit() []int {

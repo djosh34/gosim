@@ -2113,9 +2113,10 @@ var (
 //
 // cockroachdb/ttycolor panics when it cannot stat os.Stdout, so fstat of
 // the standard files reports a terminal, as on a machine (SysFstat).
-// CockroachDB's logging copies stderr with fcntl. Initializers that make
-// keys read random bytes, which come from the run's random stream, as on
-// a machine (SysGetrandom). Every other call fails with ENOSYS.
+// CockroachDB's logging copies stderr with fcntl, and close frees such a
+// copy. Initializers that make keys read random bytes, which come from the
+// run's random stream, as on a machine (SysGetrandom). Every other call
+// fails with ENOSYS.
 //
 //go:norace
 func noMachineSyscall(name string, s *syscallabi.Syscall) {
