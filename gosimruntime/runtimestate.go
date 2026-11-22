@@ -4,6 +4,8 @@ import (
 	"runtime"
 	"runtime/metrics"
 	"unsafe"
+
+	"github.com/jellevandenhooff/gosim/internal/race"
 )
 
 // The functions in this file stand in for the parts of package runtime and
@@ -34,13 +36,19 @@ func GOMAXPROCS(n int) int {
 func NumGoroutine() int {
 	g := getg()
 	n := 0
+	// The scheduler counts in the upcall; the race detector learns that
+	// the count passes from this goroutine to the scheduler and back.
+	race.Release(unsafe.Pointer(&n))
 	g.upcall(func() {
+		race.Acquire(unsafe.Pointer(&n))
 		for _, other := range gs.get().goroutines {
 			if other.machine == g.machine {
 				n++
 			}
 		}
+		race.Release(unsafe.Pointer(&n))
 	})
+	race.Acquire(unsafe.Pointer(&n))
 	return n
 }
 

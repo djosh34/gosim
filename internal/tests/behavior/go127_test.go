@@ -518,7 +518,11 @@ func TestReseed(t *testing.T) {
 func TestSometimesCrashOnSyncOff(t *testing.T) {
 	// The machine turns crashes on and off again, then syncs 200 times.
 	var done bool
+	// The token orders the machine's write of done before the read here.
+	gosimruntime.TestRaceToken.Release()
 	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		defer gosimruntime.TestRaceToken.Release()
 		gosim.CurrentMachine().SetSometimesCrashOnSync(true)
 		gosim.CurrentMachine().SetSometimesCrashOnSync(false)
 		f, err := os.OpenFile("f", os.O_CREATE|os.O_WRONLY, 0o600)
@@ -536,6 +540,7 @@ func TestSometimesCrashOnSyncOff(t *testing.T) {
 		done = true
 	})
 	m.Wait()
+	gosimruntime.TestRaceToken.Acquire()
 	if !done {
 		t.Error("the machine crashed in fsync after SetSometimesCrashOnSync(false)")
 	}
@@ -543,7 +548,11 @@ func TestSometimesCrashOnSyncOff(t *testing.T) {
 
 func TestSometimesCrashOnSyncOn(t *testing.T) {
 	var done bool
+	// The token orders the machine's write of done before the read here.
+	gosimruntime.TestRaceToken.Release()
 	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		defer gosimruntime.TestRaceToken.Release()
 		gosim.CurrentMachine().SetSometimesCrashOnSync(true)
 		f, err := os.OpenFile("f", os.O_CREATE|os.O_WRONLY, 0o600)
 		if err != nil {
@@ -560,6 +569,7 @@ func TestSometimesCrashOnSyncOn(t *testing.T) {
 		done = true
 	})
 	m.Wait()
+	gosimruntime.TestRaceToken.Acquire()
 	if done {
 		t.Error("200 fsyncs with SetSometimesCrashOnSync(true) and no crash")
 	}
@@ -582,12 +592,19 @@ func TestRuntimeState(t *testing.T) {
 	stop := make(chan struct{})
 	go func() { <-stop }()
 	// A goroutine on another machine does not count.
-	m := gosim.NewSimpleMachine(func() { <-stop })
+	gosimruntime.TestRaceToken.Release()
+	m := gosim.NewSimpleMachine(func() {
+		gosimruntime.TestRaceToken.Acquire()
+		ch := stop
+		gosimruntime.TestRaceToken.Release()
+		<-ch
+	})
 	if n := runtime.NumGoroutine(); n != before+1 {
 		t.Errorf("NumGoroutine: %d, want %d", n, before+1)
 	}
 	close(stop)
 	m.Wait()
+	gosimruntime.TestRaceToken.Acquire()
 
 	ms := runtime.MemStats{Alloc: 1}
 	runtime.ReadMemStats(&ms)
