@@ -55,3 +55,25 @@ func TestReadMetrics(t *testing.T) {
 		}
 	}
 }
+
+func TestSimStack(t *testing.T) {
+	in := "goroutine 3971 [running]:\n" +
+		"github.com/jellevandenhooff/gosim/gosimruntime.Stack({0x4c5e0eba9900, 0x10000, 0x10000}, 0x0)\n" +
+		"\t/src/gosimruntime/runtimestate.go:120 +0x40\n" +
+		"example.com/p.(*T).f(0x4c5e0eba9900, {0xdf17300, 0x4c5e25ab3420}, ...)\n" +
+		"\t/src/p/p.go:10 +0xa0\n" +
+		"example.com/p.g[...](0xdf17258?)\n" +
+		"\t/src/p/p.go:20 +0x18\n" +
+		"created by example.com/p.h in goroutine 205348\n" +
+		"\t/src/p/p.go:30 +0x64\n"
+	want := "goroutine 7 [running]:\n" +
+		"example.com/p.(*T).f(...)\n" +
+		"\t/src/p/p.go:10 +0xa0\n" +
+		"example.com/p.g[...](...)\n" +
+		"\t/src/p/p.go:20 +0x18\n" +
+		"created by example.com/p.h\n" +
+		"\t/src/p/p.go:30 +0x64\n"
+	if got := string(simStack([]byte(in), 7)); got != want {
+		t.Errorf("simStack:\n%s\nwant:\n%s", got, want)
+	}
+}

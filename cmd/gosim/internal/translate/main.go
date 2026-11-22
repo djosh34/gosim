@@ -120,6 +120,7 @@ var replacements = map[packageSelector]packageSelector{
 	{Pkg: "runtime", Selector: "NumCPU"}:       {Pkg: gosimruntimePackage, Selector: "NumCPU"},
 	{Pkg: "runtime", Selector: "GOMAXPROCS"}:   {Pkg: gosimruntimePackage, Selector: "GOMAXPROCS"},
 	{Pkg: "runtime", Selector: "NumGoroutine"}: {Pkg: gosimruntimePackage, Selector: "NumGoroutine"},
+	{Pkg: "runtime", Selector: "Stack"}:        {Pkg: gosimruntimePackage, Selector: "Stack"},
 	{Pkg: "runtime", Selector: "ReadMemStats"}: {Pkg: gosimruntimePackage, Selector: "ReadMemStats"},
 	{Pkg: "runtime/metrics", Selector: "Read"}: {Pkg: gosimruntimePackage, Selector: "ReadMetrics"},
 }

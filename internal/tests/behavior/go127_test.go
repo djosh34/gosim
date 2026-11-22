@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"runtime/metrics"
 	"runtime/pprof"
 	"slices"
@@ -623,6 +624,33 @@ func TestRuntimeState(t *testing.T) {
 		for _, c := range v.Float64Histogram().Counts {
 			if c != 0 {
 				t.Errorf("%s: count %d, want 0", samples[1].Name, c)
+			}
+		}
+	}
+}
+
+// TestStack checks that runtime.Stack and debug.Stack give the same text on
+// every run of a seed: TestMetaDeterministic compares the logged stacks.
+func TestStack(t *testing.T) {
+	buf := make([]byte, 1<<16)
+	stacks := []string{string(buf[:runtime.Stack(buf, false)]), string(debug.Stack())}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		stacks = append(stacks, string(debug.Stack()))
+	}()
+	<-done
+	for _, s := range stacks {
+		t.Log(s)
+		if !strings.HasPrefix(s, "goroutine ") || !strings.Contains(s, "TestStack") {
+			t.Errorf("not a stack of TestStack:\n%s", s)
+		}
+		if strings.Contains(s, " in goroutine ") || strings.Contains(s, "gosimruntime.Stack(") {
+			t.Errorf("a stack names a creating goroutine or Stack itself:\n%s", s)
+		}
+		for _, line := range strings.Split(s, "\n") {
+			if !strings.HasPrefix(line, "\t") && strings.Contains(line, "0x") {
+				t.Errorf("a frame shows its arguments: %s", line)
 			}
 		}
 	}

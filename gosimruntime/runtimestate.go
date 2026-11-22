@@ -1,6 +1,8 @@
 package gosimruntime
 
 import (
+	"bytes"
+	"fmt"
 	"runtime"
 	"runtime/metrics"
 	"unsafe"
@@ -86,4 +88,71 @@ func ReadMetrics(samples []metrics.Sample) {
 			})
 		}
 	}
+}
+
+// Stack stands in for runtime.Stack, and so for runtime/debug.Stack. It
+// formats the calling goroutine's stack as the real runtime does, with what
+// differs between two runs of a seed taken out: the goroutine's number is
+// its number in the simulation, a frame's arguments read "...", and a
+// "created by" line does not name the creating goroutine. With all set it
+// still formats only the calling goroutine: the other simulated goroutines'
+// stacks are not the real runtime's to report.
+//
+//go:noinline
+func Stack(buf []byte, all bool) int {
+	tmp := make([]byte, 64<<10)
+	for {
+		n := runtime.Stack(tmp, false)
+		if n < len(tmp) {
+			tmp = tmp[:n]
+			break
+		}
+		tmp = make([]byte, 2*len(tmp))
+	}
+	return copy(buf, simStack(tmp, goroutineID(getg())))
+}
+
+// goroutineID returns g's number in the simulation. The scheduler sets it
+// before g first runs, on a real goroutine that may have run others before;
+// the race detector does not see that order.
+//
+//go:norace
+func goroutineID(g *goroutine) int {
+	return g.ID
+}
+
+// simStack rewrites a stack that runtime.Stack formatted, called from
+// Stack, as Stack describes.
+func simStack(stack []byte, id int) []byte {
+	var out bytes.Buffer
+	lines := bytes.Split(stack, []byte("\n"))
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		switch {
+		case bytes.HasPrefix(line, []byte("goroutine ")):
+			if j := bytes.IndexByte(line, '['); j >= 0 {
+				line = fmt.Appendf(nil, "goroutine %d %s", id, line[j:])
+			}
+			out.Write(line)
+			out.WriteByte('\n')
+			// The frame of Stack itself, and its file line.
+			if i+1 < len(lines) && bytes.HasPrefix(lines[i+1], []byte("github.com/jellevandenhooff/gosim/gosimruntime.Stack(")) {
+				i += 2
+			}
+			continue
+		case bytes.HasPrefix(line, []byte("created by ")):
+			if j := bytes.Index(line, []byte(" in goroutine ")); j >= 0 {
+				line = line[:j]
+			}
+		case len(line) > 0 && line[0] != '\t' && line[len(line)-1] == ')':
+			if j := bytes.LastIndexByte(line, '('); j >= 0 {
+				line = append(line[:j:j], "(...)"...)
+			}
+		}
+		out.Write(line)
+		if i < len(lines)-1 {
+			out.WriteByte('\n')
+		}
+	}
+	return out.Bytes()
 }
