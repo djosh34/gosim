@@ -115,6 +115,13 @@ var replacements = map[packageSelector]packageSelector{
 	{Pkg: "runtime", Selector: "SetFinalizer"}:             {Pkg: gosimruntimePackage, Selector: "SetFinalizer"},
 	{Pkg: "runtime", Selector: "GOOS"}:                     {Pkg: gosimruntimePackage, Selector: "GOOS"},
 	{Pkg: "runtime", Selector: "Gosched"}:                  {Pkg: gosimruntimePackage, Selector: "Yield"},
+	// The real runtime's state differs between runs of a seed; see
+	// gosimruntime/runtimestate.go.
+	{Pkg: "runtime", Selector: "NumCPU"}:       {Pkg: gosimruntimePackage, Selector: "NumCPU"},
+	{Pkg: "runtime", Selector: "GOMAXPROCS"}:   {Pkg: gosimruntimePackage, Selector: "GOMAXPROCS"},
+	{Pkg: "runtime", Selector: "NumGoroutine"}: {Pkg: gosimruntimePackage, Selector: "NumGoroutine"},
+	{Pkg: "runtime", Selector: "ReadMemStats"}: {Pkg: gosimruntimePackage, Selector: "ReadMemStats"},
+	{Pkg: "runtime/metrics", Selector: "Read"}: {Pkg: gosimruntimePackage, Selector: "ReadMetrics"},
 }
 
 const gosimModPath = gosimtool.Module

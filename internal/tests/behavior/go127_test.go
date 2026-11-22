@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/metrics"
 	"runtime/pprof"
 	"slices"
 	"strings"
@@ -511,5 +512,101 @@ func TestReseed(t *testing.T) {
 	}
 	if other := round(8, 3); slices.Equal(first, other) {
 		t.Errorf("seeds 7 and 8 drew the same: %v", other)
+	}
+}
+
+func TestSometimesCrashOnSyncOff(t *testing.T) {
+	// The machine turns crashes on and off again, then syncs 200 times.
+	var done bool
+	m := gosim.NewSimpleMachine(func() {
+		gosim.CurrentMachine().SetSometimesCrashOnSync(true)
+		gosim.CurrentMachine().SetSometimesCrashOnSync(false)
+		f, err := os.OpenFile("f", os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer f.Close()
+		for i := 0; i < 200; i++ {
+			if err := f.Sync(); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+		done = true
+	})
+	m.Wait()
+	if !done {
+		t.Error("the machine crashed in fsync after SetSometimesCrashOnSync(false)")
+	}
+}
+
+func TestSometimesCrashOnSyncOn(t *testing.T) {
+	var done bool
+	m := gosim.NewSimpleMachine(func() {
+		gosim.CurrentMachine().SetSometimesCrashOnSync(true)
+		f, err := os.OpenFile("f", os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer f.Close()
+		for i := 0; i < 200; i++ {
+			if err := f.Sync(); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+		done = true
+	})
+	m.Wait()
+	if done {
+		t.Error("200 fsyncs with SetSometimesCrashOnSync(true) and no crash")
+	}
+}
+
+// TestRuntimeState checks that the reads of the real runtime's state give
+// the simulation's fixed values.
+func TestRuntimeState(t *testing.T) {
+	if n := runtime.NumCPU(); n != gosimruntime.SimCPUs {
+		t.Errorf("NumCPU: %d, want %d", n, gosimruntime.SimCPUs)
+	}
+	if n := runtime.GOMAXPROCS(16); n != gosimruntime.SimCPUs {
+		t.Errorf("GOMAXPROCS(16): %d, want %d", n, gosimruntime.SimCPUs)
+	}
+	if n := runtime.GOMAXPROCS(0); n != gosimruntime.SimCPUs {
+		t.Errorf("GOMAXPROCS(0) after GOMAXPROCS(16): %d, want %d", n, gosimruntime.SimCPUs)
+	}
+
+	before := runtime.NumGoroutine()
+	stop := make(chan struct{})
+	go func() { <-stop }()
+	// A goroutine on another machine does not count.
+	m := gosim.NewSimpleMachine(func() { <-stop })
+	if n := runtime.NumGoroutine(); n != before+1 {
+		t.Errorf("NumGoroutine: %d, want %d", n, before+1)
+	}
+	close(stop)
+	m.Wait()
+
+	ms := runtime.MemStats{Alloc: 1}
+	runtime.ReadMemStats(&ms)
+	if ms != (runtime.MemStats{}) {
+		t.Errorf("ReadMemStats: %+v, want zeros", ms)
+	}
+
+	samples := []metrics.Sample{{Name: "/sched/goroutines:goroutines"}, {Name: "/sched/latencies:seconds"}}
+	metrics.Read(samples)
+	if v := samples[0].Value; v.Kind() != metrics.KindUint64 || v.Uint64() != 0 {
+		t.Errorf("%s: %v %v, want KindUint64 0", samples[0].Name, v.Kind(), v.Uint64())
+	}
+	if v := samples[1].Value; v.Kind() != metrics.KindFloat64Histogram || len(v.Float64Histogram().Counts) == 0 {
+		t.Errorf("%s: %v, want a histogram", samples[1].Name, v.Kind())
+	} else {
+		for _, c := range v.Float64Histogram().Counts {
+			if c != 0 {
+				t.Errorf("%s: count %d, want 0", samples[1].Name, c)
+			}
+		}
 	}
 }
