@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/dave/dst"
 	"golang.org/x/tools/go/ast/astutil"
@@ -543,10 +544,22 @@ func (t *packageTranslator) unshadow(obj *types.TypeName, id *dst.Ident) dst.Exp
 	if _, isPkg := found.(*types.PkgName); isPkg || found == nil {
 		return id
 	}
-	alias := "GosimAlias_" + obj.Pkg().Name() + "_" + id.Name
+	// The package's path, not its name, which two packages can share.
+	alias := "GosimAlias_" + identFromPath(obj.Pkg().Path()) + "_" + id.Name
 	if t.localAliases == nil {
 		t.localAliases = make(map[string]*dst.Ident)
 	}
 	t.localAliases[alias] = &dst.Ident{Name: id.Name, Path: id.Path}
 	return dst.NewIdent(alias)
+}
+
+// identFromPath turns a package path into a part of an identifier: every
+// character that is not a letter or digit becomes an underscore.
+func identFromPath(path string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return r
+		}
+		return '_'
+	}, path)
 }

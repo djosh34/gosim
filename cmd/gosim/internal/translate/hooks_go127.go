@@ -243,8 +243,9 @@ var thirdPartyHooksGo127 = map[packageSelector]packageSelector{
 
 // runtimeLinknameHooks are runtime and reflect functions that packages
 // outside the standard library declare without a body and link to with a
-// go:linkname, as Pebble and github.com/goccy/go-json do. A declaration that links to one calls its hook in
-// hooksGo127Package, named as RewriteSelector names it. The value is the
+// go:linkname, as Pebble and github.com/goccy/go-json do. A declaration
+// that links to one calls its hook in hooksGo127Package, named as
+// RewriteSelector names it. The value is the
 // function of the runtime package behind the linkname, for
 // TestRuntimeLinknameHooks.
 var runtimeLinknameHooks = map[packageSelector]string{

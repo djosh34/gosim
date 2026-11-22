@@ -665,10 +665,6 @@ var _ %s = &%s{}
 //go:norace
 func (os *%s) dispatchSyscall(s *syscallabi.Syscall) {
 	// The callers handle a call outside any machine (noMachineSyscall).
-	if os == nil {
-		s.Errno = uintptr(syscall.ENOSYS)
-		return
-	}
 	os.dispatcher.Dispatch(s)
 }
 

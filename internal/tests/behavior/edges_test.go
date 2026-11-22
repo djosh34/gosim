@@ -402,3 +402,14 @@ func TestReadDirInfo(t *testing.T) {
 		t.Errorf("d after RemoveAll: %v", err)
 	}
 }
+
+var lenSlots [5]int
+
+// lenHalf divides a constant len by a float constant: an int division.
+var lenHalf = len(lenSlots) / 2.0
+
+func TestConstantLenIsInt(t *testing.T) {
+	if lenHalf != 2 {
+		t.Errorf("len(lenSlots) / 2.0 = %v, want 2", lenHalf)
+	}
+}

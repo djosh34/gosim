@@ -410,7 +410,7 @@ func isStdPackage(pkgPath string) bool {
 }
 
 // rewriteConstantLen replaces len(x) and cap(x) that are constants, as for
-// an array x, with their value. When x is a package-level variable, gosim
+// an array x, with their value as an int constant. When x is a package-level variable, gosim
 // moves it into the package's globals, and len of the moved variable is no
 // longer a constant, which an array length needs. Go does not evaluate x
 // in such a call, so nothing is lost.
@@ -427,7 +427,13 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	if !ok || tv.Value == nil {
 		return
 	}
-	c.Replace(&dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString(), Decs: dst.BasicLitDecorations{NodeDecs: call.Decs.NodeDecs}})
+	// int(N), not N: len and cap are of type int, and an untyped N would
+	// change what an expression such as len(x)/2.0 computes.
+	c.Replace(&dst.CallExpr{
+		Fun:  dst.NewIdent("int"),
+		Args: []dst.Expr{&dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString()}},
+		Decs: dst.CallExprDecorations{NodeDecs: call.Decs.NodeDecs},
+	})
 }
 
 // rewriteEmbedFS wraps an embed.FS that is converted to an interface of

@@ -80,10 +80,6 @@ var _ linuxOSIface = &LinuxOS{}
 //go:norace
 func (os *LinuxOS) dispatchSyscall(s *syscallabi.Syscall) {
 	// The callers handle a call outside any machine (noMachineSyscall).
-	if os == nil {
-		s.Errno = uintptr(syscall.ENOSYS)
-		return
-	}
 	os.dispatcher.Dispatch(s)
 }
 
