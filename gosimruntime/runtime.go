@@ -786,6 +786,8 @@ func (g *goroutine) exitpoint() {
 		g.parkPaniced = true
 		traceback := make([]byte, 32*1024)
 		traceback = traceback[:runtime.Stack(traceback, false)]
+		// The same text on every run of a seed, as Stack gives.
+		traceback = simStack(traceback, g.ID)
 		// XXX: necessary?
 		g.parkPanicTraceback = NoraceCopy(traceback)
 		g.parkPanicValue = fmt.Sprint(recovered)

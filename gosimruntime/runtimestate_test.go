@@ -64,6 +64,8 @@ func TestSimStack(t *testing.T) {
 		"\t/src/p/p.go:10 +0xa0\n" +
 		"example.com/p.g[...](0xdf17258?)\n" +
 		"\t/src/p/p.go:20 +0x18\n" +
+		"panic({0x1a2b3c0?, 0x4c5e0eba9900?}) [recovered]\n" +
+		"\t/go/src/runtime/panic.go:800 +0x130\n" +
 		"created by example.com/p.h in goroutine 205348\n" +
 		"\t/src/p/p.go:30 +0x64\n"
 	want := "goroutine 7 [running]:\n" +
@@ -71,6 +73,8 @@ func TestSimStack(t *testing.T) {
 		"\t/src/p/p.go:10 +0xa0\n" +
 		"example.com/p.g[...](...)\n" +
 		"\t/src/p/p.go:20 +0x18\n" +
+		"panic(...) [recovered]\n" +
+		"\t/go/src/runtime/panic.go:800 +0x130\n" +
 		"created by example.com/p.h\n" +
 		"\t/src/p/p.go:30 +0x64\n"
 	if got := string(simStack([]byte(in), 7)); got != want {

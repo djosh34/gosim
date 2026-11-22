@@ -410,10 +410,11 @@ func isStdPackage(pkgPath string) bool {
 }
 
 // rewriteConstantLen replaces len(x) and cap(x) that are constants, as for
-// an array x, with their value as an int constant. When x is a package-level variable, gosim
-// moves it into the package's globals, and len of the moved variable is no
-// longer a constant, which an array length needs. Go does not evaluate x
-// in such a call, so nothing is lost.
+// an array x, with their value as an int constant, when x names a
+// package-level variable. gosim moves such a variable into the package's
+// globals, and len of the moved variable is no longer a constant, which an
+// array length needs. Go does not evaluate x in such a call, so nothing is
+// lost. Any other x stays: folding it could remove a local's only use.
 func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	call, ok := c.Node().(*dst.CallExpr)
 	if !ok || !(t.isNamedBuiltIn(call.Fun, "len") || t.isNamedBuiltIn(call.Fun, "cap")) {
@@ -424,7 +425,7 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 		return
 	}
 	tv, ok := t.typesInfo.Types[astCall]
-	if !ok || tv.Value == nil {
+	if !ok || tv.Value == nil || !t.namesGlobal(astCall.(*ast.CallExpr).Args[0]) {
 		return
 	}
 	// int(N), not N: len and cap are of type int, and an untyped N would
@@ -434,6 +435,20 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 		Args: []dst.Expr{&dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString()}},
 		Decs: dst.CallExprDecorations{NodeDecs: call.Decs.NodeDecs},
 	})
+}
+
+// namesGlobal reports whether expr names a package-level variable.
+func (t *packageTranslator) namesGlobal(expr ast.Expr) bool {
+	found := false
+	ast.Inspect(expr, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok {
+			if v, ok := t.typesInfo.Uses[id].(*types.Var); ok && v.Pkg() != nil && v.Parent() == v.Pkg().Scope() {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
 }
 
 // rewriteEmbedFS wraps an embed.FS that is converted to an interface of

@@ -242,7 +242,7 @@ func Chantypename() {
 	var ch2 gosimruntime.Chan[Ch]
 	ch2.Send(Ch(ch))
 
-	var ch3 Ch = ch
+	var ch3 Ch = Ch(ch)
 
 	// all chan ops
 	gosimruntime.ExtractChan(ch3).Recv()            // recv

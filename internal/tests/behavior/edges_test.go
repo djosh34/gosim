@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"embed"
 	"errors"
+	"io"
 	"io/fs"
 	"math/big"
 	"math/rand"
@@ -78,6 +79,11 @@ func TestBigIntRand(t *testing.T) {
 	}
 	if v := new(big.Int).Rand(r, big.NewInt(0)); v.Sign() != 0 {
 		t.Errorf("Rand with n = 0 got %v", v)
+	} // The receiver is the bound.
+	m := big.NewInt(1000)
+	m.Rand(r, m)
+	if m.Sign() < 0 || m.Cmp(n) >= 0 {
+		t.Errorf("m.Rand(r, m) with m = 1000 got %v", m)
 	}
 }
 
@@ -411,5 +417,63 @@ var lenHalf = len(lenSlots) / 2.0
 func TestConstantLenIsInt(t *testing.T) {
 	if lenHalf != 2 {
 		t.Errorf("len(lenSlots) / 2.0 = %v, want 2", lenHalf)
+	}
+}
+
+// TestEmbedFSReadDir reads an embedded directory an entry at a time.
+func TestEmbedFSReadDir(t *testing.T) {
+	var fsys fs.FS = embedded
+	f, err := fsys.Open("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	dir := f.(fs.ReadDirFile)
+	first, err := dir.ReadDir(1)
+	if err != nil || len(first) != 1 || first[0].Name() != "embed.txt" {
+		t.Fatalf("first ReadDir(1): %v, %v", first, err)
+	}
+	if rest, err := dir.ReadDir(1); len(rest) != 0 || err != io.EOF {
+		t.Errorf("second ReadDir(1): %v, %v; want io.EOF", rest, err)
+	}
+	if rest, err := dir.ReadDir(-1); len(rest) != 0 || err != nil {
+		t.Errorf("ReadDir(-1) at the end: %v, %v", rest, err)
+	}
+}
+
+// TestEmbedFSAsReadFileFS converts an embed.FS to fs.ReadFileFS.
+func TestEmbedFSAsReadFileFS(t *testing.T) {
+	var rf fs.ReadFileFS = embedded
+	if data, err := rf.ReadFile("testdata/embed.txt"); err != nil || len(data) == 0 {
+		t.Errorf("got %q, %v", data, err)
+	}
+}
+
+func localLen() int {
+	var a [4]byte
+	return len(a)
+}
+
+// TestLocalConstantLen takes len of local arrays, which stays as written.
+func TestLocalConstantLen(t *testing.T) {
+	a := [3]int{1, 2, 3}
+	var b [len(a)]int
+	if localLen() != 4 || len(b) != 3 {
+		t.Errorf("got %d and %d", localLen(), len(b))
+	}
+}
+
+// TestDupMinimum dups a standard file to a descriptor at or above 100.
+func TestDupMinimum(t *testing.T) {
+	fd, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unix.Close(fd)
+	if fd < 100 {
+		t.Errorf("got descriptor %d, below 100", fd)
+	}
+	if _, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, -1); err != unix.EINVAL {
+		t.Errorf("a negative minimum: got %v, want EINVAL", err)
 	}
 }

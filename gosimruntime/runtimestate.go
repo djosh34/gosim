@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/metrics"
+	"slices"
 	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/internal/race"
@@ -144,9 +145,13 @@ func simStack(stack []byte, id int) []byte {
 			if j := bytes.Index(line, []byte(" in goroutine ")); j >= 0 {
 				line = line[:j]
 			}
-		case len(line) > 0 && line[0] != '\t' && line[len(line)-1] == ')':
+		case len(line) > 0 && line[0] != '\t':
+			// A frame: the arguments are in the last parentheses, which
+			// a note such as " [recovered]" may follow.
 			if j := bytes.LastIndexByte(line, '('); j >= 0 {
-				line = append(line[:j:j], "(...)"...)
+				if k := bytes.IndexByte(line[j:], ')'); k >= 0 {
+					line = slices.Concat(line[:j], []byte("(...)"), line[j+k+1:])
+				}
 			}
 		}
 		out.Write(line)

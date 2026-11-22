@@ -164,9 +164,12 @@ func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ..
 // //go:uintptrescapes
 func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err syscall.Errno) {
 	if IsHandledSyscall(trap) {
-		// complain loudly if syscall that we support arrives
-		// here instead of through our renames
-		panic("syscall should have been rewritten somewhere")
+		// A syscall the simulation handles arrives here raw, from code
+		// that calls RawSyscall6 itself rather than through package
+		// syscall's wrappers, which gosim renames. The run ends, as at an
+		// unimplemented hook.
+		gosimruntime.Unimplemented("raw syscall " + SyscallName(trap))
+		return 0, 0, syscall.ENOSYS
 	}
 
 	logf("unsupported syscall %s (%d) %d %d %d %d %d %d", SyscallName(trap), trap, a1, a2, a3, a4, a5, a6)
@@ -1721,6 +1724,13 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Sysc
 		if !isStdio {
 			return 0, syscall.ENOSYS
 		}
+		// The new descriptor is the lowest free one at or above arg. File
+		// descriptors are never reused, so that is arg itself if it is
+		// above every one handed out, or the next one.
+		if arg < 0 {
+			return 0, syscall.EINVAL
+		}
+		l.nextFd = max(l.nextFd, arg)
 		newFd := l.allocFd()
 		l.files[newFd] = &stdioCopy{fd: stdio}
 		return newFd, nil

@@ -15,14 +15,16 @@ func BigIntRand(z *big.Int, rnd *rand.Rand, n *big.Int) *big.Int {
 	}
 	bits := n.BitLen()
 	buf := make([]byte, (bits+7)/8)
+	// Each draw goes to its own Int: z may be n itself, as in n.Rand(r, n).
+	draw := new(big.Int)
 	for {
 		_, _ = rnd.Read(buf)
 		// Clear the bits above n's highest one, so that at least half of
 		// the draws are below n.
 		buf[0] &= byte(0xff) >> (len(buf)*8 - bits)
-		z.SetBytes(buf)
-		if z.Cmp(n) < 0 {
-			return z
+		draw.SetBytes(buf)
+		if draw.Cmp(n) < 0 {
+			return z.Set(draw)
 		}
 	}
 }

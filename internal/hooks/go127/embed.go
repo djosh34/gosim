@@ -2,6 +2,7 @@ package go127
 
 import (
 	"embed"
+	"io"
 	"io/fs"
 	"strings"
 	"time"
@@ -11,8 +12,10 @@ import (
 // an embed.FS passed where an fs.FS is expected (rewriteEmbedFS in
 // cmd/gosim). gosim does not translate embed, whose FS implements the
 // native io/fs interfaces, not the translated ones. The files keep their
-// names, contents and modes; their times are zero, as in embed.
-func EmbedFS(e embed.FS) fs.FS { return embedFS{e: e} }
+// names, contents and modes; their times are zero, as in embed. It returns
+// the wrapper itself, not an fs.FS, so that it converts to fs.ReadFileFS
+// and fs.ReadDirFS too.
+func EmbedFS(e embed.FS) embedFS { return embedFS{e: e} }
 
 type embedFS struct{ e embed.FS }
 
@@ -73,18 +76,42 @@ type embedFile struct {
 	info embedInfo
 	fs   embedFS
 	name string
+	// dir holds the entries that ReadDir has yet to return, once it read
+	// the directory.
+	dir     []fs.DirEntry
+	dirRead bool
 }
 
 func (f *embedFile) Read(p []byte) (int, error) { return f.file.Read(p) }
 func (f *embedFile) Close() error               { return f.file.Close() }
 func (f *embedFile) Stat() (fs.FileInfo, error) { return f.info, nil }
 
-// ReadDir reads the whole directory at once, if the file is one.
+// ReadDir returns the directory's next n entries, as fs.ReadDirFile says:
+// with n > 0, at most n of them, and io.EOF once none are left; with n <= 0,
+// all that are left.
 func (f *embedFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	if !f.info.IsDir() {
 		return nil, &fs.PathError{Op: "read", Path: f.name, Err: fs.ErrInvalid}
 	}
-	return f.fs.ReadDir(f.name)
+	if !f.dirRead {
+		entries, err := f.fs.ReadDir(f.name)
+		if err != nil {
+			return nil, err
+		}
+		f.dir, f.dirRead = entries, true
+	}
+	if n <= 0 {
+		entries := f.dir
+		f.dir = nil
+		return entries, nil
+	}
+	if len(f.dir) == 0 {
+		return nil, io.EOF
+	}
+	n = min(n, len(f.dir))
+	entries := f.dir[:n:n]
+	f.dir = f.dir[n:]
+	return entries, nil
 }
 
 // embedInfo is both the fs.FileInfo and the fs.DirEntry of a file.

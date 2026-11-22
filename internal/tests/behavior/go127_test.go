@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 	"weak"
@@ -654,4 +655,32 @@ func TestStack(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestExitNonzero calls os.Exit(3) on the main machine; the meta test
+// checks that the run fails.
+func TestExitNonzero(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	os.Exit(3)
+}
+
+// TestPanicLog panics on a goroutine; the meta test checks that two runs
+// give the same checksum.
+func TestPanicLog(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	go panic("a panic for the log")
+	select {}
+}
+
+// TestRawHandledSyscall makes a syscall the simulation handles through
+// RawSyscall6; the meta test checks that the run fails, without a panic.
+func TestRawHandledSyscall(t *testing.T) {
+	if os.Getenv("TESTINGFAIL") != "1" {
+		t.Skip()
+	}
+	syscall.RawSyscall6(syscall.SYS_FCHMOD, ^uintptr(0), 0o644, 0, 0, 0, 0)
 }

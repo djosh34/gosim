@@ -3,6 +3,7 @@
 package go127
 
 import (
+	"fmt"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -44,8 +45,12 @@ func Syscall_Getpagesize() int {
 // Syscall_Exit ends the machine's process: the machine stops as after a
 // clean shutdown, and what it wrote stays on its disk, as a process's
 // writes outlive it. The exit code goes nowhere; a machine's Wait returns.
-// os.Exit on the main machine ends the test.
+// os.Exit on the main machine ends the test: with code 0 as if the test
+// returned, with any other code as a failure of the run.
 func Syscall_Exit(code int) {
+	if code != 0 && simulation.CurrentMachineID() == simulation.MainMachineID {
+		gosimruntime.Fatal(fmt.Sprintf("os.Exit(%d) on the main machine", code))
+	}
 	simulation.SyscallMachineStop(simulation.CurrentMachineID(), true)
 	// The stop ends every goroutine of the machine, this one too.
 	select {}

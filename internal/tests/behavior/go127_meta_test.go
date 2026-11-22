@@ -131,3 +131,41 @@ func TestForTestBinary(t *testing.T) {
 		t.Errorf("got %v, %+v", err, run)
 	}
 }
+
+func TestExitNonzero(t *testing.T) {
+	run, err := metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestExitNonzero", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "os.Exit(3) on the main machine"; !run.Failed || !strings.Contains(run.Err, want) {
+		t.Errorf("got failed %v, err %q; want err with %q", run.Failed, run.Err, want)
+	}
+}
+
+func TestPanicLog(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	var checksums []string
+	for range 2 {
+		run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestPanicLog", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !run.Failed || !strings.Contains(string(run.LogOutput), "a panic for the log") {
+			t.Fatalf("got failed %v, log %s", run.Failed, run.LogOutput)
+		}
+		checksums = append(checksums, string(run.Checksum))
+	}
+	if checksums[0] != checksums[1] {
+		t.Errorf("two runs of a panic gave different checksums")
+	}
+}
+
+func TestRawHandledSyscall(t *testing.T) {
+	run, err := metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestRawHandledSyscall", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "unimplemented hook: raw syscall SYS_FCHMOD"; !run.Failed || run.Err != want {
+		t.Errorf("got failed %v, err %q; want err %q", run.Failed, run.Err, want)
+	}
+}

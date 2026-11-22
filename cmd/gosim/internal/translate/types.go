@@ -453,6 +453,18 @@ func (b *implicitConversionsBuilder) before(c *astutil.Cursor) bool {
 			}
 		}
 
+	case *ast.ValueSpec:
+		// var x T = v converts v to T.
+		if node.Type == nil || len(node.Names) != len(node.Values) {
+			break
+		}
+		to := b.typesInfo.TypeOf(node.Type)
+		for _, v := range node.Values {
+			if from := b.typesInfo.TypeOf(v); to != nil && from != nil && !types.Identical(to, from) {
+				b.conversions[v] = to
+			}
+		}
+
 	case *ast.SendStmt:
 		// xxx: this can happen if we have a call
 

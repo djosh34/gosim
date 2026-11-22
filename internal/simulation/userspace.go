@@ -19,6 +19,10 @@ var (
 	currentMachineID int
 )
 
+// MainMachineID is the ID of the main machine, which runs the test: the
+// first machine a simulation makes, and machines are numbered from 1.
+const MainMachineID = 1
+
 func CurrentMachineID() int {
 	return currentMachineID
 }
