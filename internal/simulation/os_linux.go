@@ -2088,10 +2088,12 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 }
 
 // noMachineDups are the descriptors that noMachineSyscall's F_DUPFD handed
-// out in the pass outside any machine.
+// out in the pass outside any machine and that are not closed. gosim
+// translates this package too, so the map is made on first use: the pass
+// runs before the package's own initializers.
 var (
 	noMachineDupsMu sync.Mutex
-	noMachineDups   = make(map[int]bool)
+	noMachineDups   map[int]bool
 )
 
 // noMachineSyscall answers a system call made outside any machine. That
@@ -2132,6 +2134,9 @@ func noMachineSyscall(name string, s *syscallabi.Syscall) {
 			// copies: each gets its own number at or above arg.
 			noMachineDupsMu.Lock()
 			defer noMachineDupsMu.Unlock()
+			if noMachineDups == nil {
+				noMachineDups = make(map[int]bool)
+			}
 			newFd := max(arg, 100)
 			for noMachineDups[newFd] {
 				newFd++
@@ -2142,6 +2147,15 @@ func noMachineSyscall(name string, s *syscallabi.Syscall) {
 			}
 			noMachineDups[newFd] = true
 			s.R0 = uintptr(newFd)
+			s.Errno = 0
+			return
+		}
+	case "SysClose":
+		// A copy that F_DUPFD made above.
+		noMachineDupsMu.Lock()
+		defer noMachineDupsMu.Unlock()
+		if fd := int(s.Int0); noMachineDups[fd] {
+			delete(noMachineDups, fd)
 			s.Errno = 0
 			return
 		}

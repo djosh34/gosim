@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"embed"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math/big"
@@ -585,7 +586,15 @@ const (
 	lenNilChan    = len([1]chan int{nil})
 	lenNilMapConv = len([1]map[int]int{map[int]int(nil)})
 	lenNilField   = len([1]struct{ m map[int]int }{{m: nil}})
+	lenNilStruct  = len([1]lenFields{{M: nil, C: nil}})
+	lenNilPos     = len([1]lenFields{{nil, nil}})
+	lenParamLit   = len([1]func(int) int{func(v int) int { return v + lenSource[0] }})
 )
+
+type lenFields struct {
+	M map[int]int
+	C chan int
+}
 
 // lenFuncLitLocal takes len of an array of a function literal, with a
 // variable of its own, and a global.
@@ -594,7 +603,38 @@ func lenFuncLitLocal() int {
 }
 
 func TestConstantLenOperands(t *testing.T) {
-	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen(), lenNilMap, lenNilChan, lenNilMapConv, lenNilField, lenFuncLitLocal()}; !slices.Equal(got, []int{2, 2, 45, 1, 1, 1, 1, 2}) {
+	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen(), lenNilMap, lenNilChan, lenNilMapConv, lenNilField, lenFuncLitLocal(), lenNilStruct, lenNilPos, lenParamLit}; !slices.Equal(got, []int{2, 2, 45, 1, 1, 1, 1, 2, 1, 1, 1}) {
 		t.Errorf("got %v", got)
+	}
+}
+
+// initDups copies stdout and stderr in an initializer, as CockroachDB's
+// logging does, closes one copy and copies again, then closes the rest.
+// gosim runs initializers
+// once outside any machine too, where a panic here ends the run.
+var initDups = dupInInit()
+
+func dupInInit() []int {
+	a, errA := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 3)
+	b, errB := unix.FcntlInt(2, unix.F_DUPFD_CLOEXEC, 3)
+	if errA != nil || errB != nil || a == b {
+		panic(fmt.Sprintf("dups in an initializer: %d, %v and %d, %v", a, errA, b, errB))
+	}
+	if err := unix.Close(a); err != nil {
+		panic(fmt.Sprintf("closing a dup in an initializer: %v", err))
+	}
+	c, errC := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 3)
+	if errC != nil || c == b {
+		panic(fmt.Sprintf("dup after close in an initializer: %d, %v", c, errC))
+	}
+	// Leave no copy open, for TestDupMinimum.
+	unix.Close(b)
+	unix.Close(c)
+	return []int{a, b, c}
+}
+
+func TestDupInInit(t *testing.T) {
+	if len(initDups) != 3 {
+		t.Errorf("got %v", initDups)
 	}
 }
