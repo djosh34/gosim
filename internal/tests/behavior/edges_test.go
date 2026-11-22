@@ -528,6 +528,23 @@ func TestDupMinimum(t *testing.T) {
 	if fd, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 1<<20-1); err != unix.EMFILE {
 		t.Errorf("minimum 2^20-1 again: got %d, %v; want EMFILE", fd, err)
 	}
+	// An open does not get the descriptor of a closed dup.
+	dup, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unix.Close(dup)
+	for range 50 {
+		g, err := os.OpenFile("dup2", os.O_CREATE|os.O_RDWR, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := int(g.Fd())
+		g.Close()
+		if got == dup {
+			t.Fatalf("an open got %d, a closed dup's descriptor", dup)
+		}
+	}
 	// An open after the high dup gets a low descriptor.
 	f, err := os.OpenFile("dup", os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {

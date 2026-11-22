@@ -35,7 +35,10 @@ type LinuxOS struct {
 	mu       sync.Mutex
 	shutdown bool
 
-	files  map[int]interface{}
+	files map[int]interface{}
+	// dupFds are the descriptors at or above nextFd that F_DUPFD handed
+	// out, closed or not, which allocFd skips.
+	dupFds map[int]bool
 	nextFd int
 
 	mmaps map[uintptr]*fs.Mmap
@@ -58,6 +61,7 @@ func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.
 		machine: machine,
 
 		files:  make(map[int]interface{}),
+		dupFds: make(map[int]bool),
 		nextFd: 5,
 
 		mmaps: make(map[uintptr]*fs.Mmap),
@@ -182,12 +186,15 @@ func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err sysc
 // limit of open files.
 const maxFds = 1 << 20
 
-// lowestFreeFd returns the lowest free file descriptor at or above min and
-// below maxFds, as F_DUPFD takes it, and false if there is none. 0 to 2
-// are the standard files'. The caller puts the descriptor in files.
+// lowestFreeFd takes the lowest free file descriptor at or above min and
+// below maxFds, as F_DUPFD does, and reports false if there is none. 0 to
+// 2 are the standard files'. The caller puts the descriptor in files.
 func (l *LinuxOS) lowestFreeFd(min int) (int, bool) {
 	for fd := max(min, 3); fd < maxFds; fd++ {
 		if _, ok := l.files[fd]; !ok {
+			if fd >= l.nextFd {
+				l.dupFds[fd] = true
+			}
 			return fd, true
 		}
 	}
@@ -195,15 +202,17 @@ func (l *LinuxOS) lowestFreeFd(min int) (int, bool) {
 }
 
 // allocFd returns a new file descriptor for open, socket and accept: the
-// next one from nextFd up that is free, so that a descriptor closed is not
-// handed out again by them, which makes a use after close fail. F_DUPFD
-// may have taken one above nextFd already. The caller puts the descriptor
-// in files.
+// next one from nextFd up that no one has had, so that a descriptor
+// closed is not handed out again by them, which makes a use after close
+// fail. It skips the ones F_DUPFD took above nextFd (dupFds). The caller
+// puts the descriptor in files.
 func (l *LinuxOS) allocFd() int {
 	for {
 		fd := l.nextFd
 		l.nextFd++
-		if _, ok := l.files[fd]; !ok {
+		taken := l.dupFds[fd]
+		delete(l.dupFds, fd)
+		if !taken {
 			return fd
 		}
 	}
