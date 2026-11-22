@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -679,12 +680,20 @@ func TestPanicLog(t *testing.T) {
 // TestRawHandledSyscall makes a syscall the simulation handles through
 // RawSyscall6, bypassing package syscall: it fails, and the run goes on.
 func TestRawHandledSyscall(t *testing.T) {
-	if _, _, errno := syscall.RawSyscall6(syscall.SYS_FCHMOD, ^uintptr(0), 0o644, 0, 0, 0, 0); errno == 0 {
-		t.Error("fchmod of no file succeeded")
+	_, _, errno := syscall.RawSyscall6(syscall.SYS_FCHMOD, ^uintptr(0), 0o644, 0, 0, 0, 0)
+	// Natively, fchmod of no file fails with EBADF.
+	if want := map[bool]syscall.Errno{true: syscall.ENOSYS, false: syscall.EBADF}[gosim.IsSim()]; errno != want {
+		t.Errorf("got %v, want %v", errno, want)
 	}
 }
 
 func stackAllBlocked(ch chan struct{}) { <-ch }
+
+func stackAllSpinning(stop *atomic.Bool) {
+	for !stop.Load() {
+		runtime.Gosched()
+	}
+}
 
 // TestStackAll checks that runtime.Stack with all lists the goroutines of
 // the caller's machine, and only those.
@@ -692,6 +701,9 @@ func TestStackAll(t *testing.T) {
 	ch := make(chan struct{})
 	defer close(ch)
 	go stackAllBlocked(ch)
+	var stop atomic.Bool
+	defer stop.Store(true)
+	go stackAllSpinning(&stop)
 	gosimruntime.TestRaceToken.Release()
 	m := gosim.NewSimpleMachine(func() {
 		gosimruntime.TestRaceToken.Acquire()
@@ -699,12 +711,20 @@ func TestStackAll(t *testing.T) {
 		gosimruntime.TestRaceToken.Release()
 		otherMachineBlocked(c)
 	})
-	time.Sleep(time.Millisecond)
+	// Let the goroutines start; time does not pass while one spins.
+	for range 10 {
+		runtime.Gosched()
+	}
 	buf := make([]byte, 1<<16)
 	s := string(buf[:runtime.Stack(buf, true)])
 	t.Log(s)
 	if !strings.Contains(s, "stackAllBlocked") || !strings.Contains(s, "TestStackAll") {
 		t.Errorf("not the stacks of this machine's goroutines:\n%s", s)
+	}
+	for fn, state := range map[string]string{"stackAllSpinning": "[runnable]", "stackAllBlocked": "[waiting]"} {
+		if header := stackHeaderOf(s, fn); !strings.Contains(header, state) {
+			t.Errorf("%s: header %q, want %s", fn, header, state)
+		}
 	}
 	if strings.Contains(s, "otherMachineBlocked") {
 		t.Errorf("a goroutine of another machine:\n%s", s)
@@ -713,3 +733,15 @@ func TestStackAll(t *testing.T) {
 }
 
 func otherMachineBlocked(ch chan struct{}) { <-ch }
+
+// stackHeaderOf returns the "goroutine N [state]:" line of the stack in
+// dump that runs fn.
+func stackHeaderOf(dump, fn string) string {
+	for _, stack := range strings.Split(dump, "\ngoroutine ") {
+		if strings.Contains(stack, "."+fn+"(") {
+			header, _, _ := strings.Cut(stack, "\n")
+			return header
+		}
+	}
+	return ""
+}

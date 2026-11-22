@@ -113,39 +113,50 @@ func Stack(buf []byte, all bool) int {
 	g := getg()
 	out := simStack(tmp, goroutineID(g))
 	if all {
-		for _, id := range machineGoroutines(g) {
+		for _, peer := range machineGoroutines(g) {
 			out = append(out, '\n')
-			out = appendGoroutineStack(out, id)
+			out = appendGoroutineStack(out, peer)
 		}
 	}
 	return copy(buf, out)
 }
 
-// machineGoroutines returns the numbers of the goroutines of g's machine
-// other than g, in order.
-func machineGoroutines(g *goroutine) []int {
-	var ids []int
-	race.Release(unsafe.Pointer(&ids))
-	g.upcall(func() {
-		race.Acquire(unsafe.Pointer(&ids))
-		for _, other := range gs.get().goroutines {
-			if other.machine == g.machine && other != g {
-				ids = append(ids, other.ID)
-			}
-		}
-		race.Release(unsafe.Pointer(&ids))
-	})
-	race.Acquire(unsafe.Pointer(&ids))
-	slices.Sort(ids)
-	return ids
+// peerGoroutine is a goroutine of the caller's machine, as Stack lists it:
+// its number, and runnable or waiting, as the simulation's scheduler has it.
+type peerGoroutine struct {
+	id    int
+	state string
 }
 
-// appendGoroutineStack appends the stack of the goroutine numbered id, as
+// machineGoroutines returns the goroutines of g's machine other than g, by
+// number.
+func machineGoroutines(g *goroutine) []peerGoroutine {
+	var peers []peerGoroutine
+	race.Release(unsafe.Pointer(&peers))
+	g.upcall(func() {
+		race.Acquire(unsafe.Pointer(&peers))
+		for _, other := range gs.get().goroutines {
+			if other.machine == g.machine && other != g {
+				state := "waiting"
+				if other.runnableIdx.idx != -1 {
+					state = "runnable"
+				}
+				peers = append(peers, peerGoroutine{id: other.ID, state: state})
+			}
+		}
+		race.Release(unsafe.Pointer(&peers))
+	})
+	race.Acquire(unsafe.Pointer(&peers))
+	slices.SortFunc(peers, func(a, b peerGoroutine) int { return a.id - b.id })
+	return peers
+}
+
+// appendGoroutineStack appends the stack of a peer goroutine, as
 // GetStacktraceFor captures it.
-func appendGoroutineStack(out []byte, id int) []byte {
+func appendGoroutineStack(out []byte, peer peerGoroutine) []byte {
 	pcs := make([]uintptr, 128)
-	n := GetStacktraceFor(id, pcs)
-	out = fmt.Appendf(out, "goroutine %d [waiting]:\n", id)
+	n := GetStacktraceFor(peer.id, pcs)
+	out = fmt.Appendf(out, "goroutine %d [%s]:\n", peer.id, peer.state)
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		f, more := frames.Next()

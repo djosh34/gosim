@@ -182,25 +182,31 @@ func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err sysc
 // limit of open files.
 const maxFds = 1 << 20
 
-// lowestFreeFd takes the lowest free file descriptor at or above min, as
-// F_DUPFD does, for min below maxFds. allocFd hands out the descriptors
-// from nextFd up, which starts at 5, so the free ones below nextFd are
-// those closed since, from 5 up; 0 to 2 are the standard files'.
-func (l *LinuxOS) lowestFreeFd(min int) int {
-	fd := max(min, 5)
-	for ; fd < l.nextFd; fd++ {
+// lowestFreeFd returns the lowest free file descriptor at or above min and
+// below maxFds, as F_DUPFD takes it, and false if there is none. 0 to 2
+// are the standard files'. The caller puts the descriptor in files.
+func (l *LinuxOS) lowestFreeFd(min int) (int, bool) {
+	for fd := max(min, 3); fd < maxFds; fd++ {
+		if _, ok := l.files[fd]; !ok {
+			return fd, true
+		}
+	}
+	return 0, false
+}
+
+// allocFd returns a new file descriptor for open, socket and accept: the
+// next one from nextFd up that is free, so that a descriptor closed is not
+// handed out again by them, which makes a use after close fail. F_DUPFD
+// may have taken one above nextFd already. The caller puts the descriptor
+// in files.
+func (l *LinuxOS) allocFd() int {
+	for {
+		fd := l.nextFd
+		l.nextFd++
 		if _, ok := l.files[fd]; !ok {
 			return fd
 		}
 	}
-	l.nextFd = fd
-	return l.allocFd()
-}
-
-func (l *LinuxOS) allocFd() int {
-	fd := l.nextFd
-	l.nextFd++
-	return fd
 }
 
 func (l *LinuxOS) PollOpen(fd int, desc syscallabi.ValueView[syscallabi.PollDesc], invocation *syscallabi.Syscall) int {
@@ -1747,7 +1753,10 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Sysc
 		if arg < 0 || arg >= maxFds {
 			return 0, syscall.EINVAL
 		}
-		newFd := l.lowestFreeFd(arg)
+		newFd, ok := l.lowestFreeFd(arg)
+		if !ok {
+			return 0, syscall.EMFILE
+		}
 		l.files[newFd] = &stdioCopy{fd: stdio}
 		return newFd, nil
 	case syscall.F_GETFD, syscall.F_SETFD:
@@ -2078,6 +2087,13 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 	return nil
 }
 
+// noMachineDups are the descriptors that noMachineSyscall's F_DUPFD handed
+// out in the pass outside any machine.
+var (
+	noMachineDupsMu sync.Mutex
+	noMachineDups   = make(map[int]bool)
+)
+
 // noMachineSyscall answers a system call made outside any machine. That
 // happens when gosimruntime runs every package's initializers once to set
 // the globals that machines share: the other globals it computes there are
@@ -2112,9 +2128,20 @@ func noMachineSyscall(name string, s *syscallabi.Syscall) {
 				s.Errno = uintptr(syscall.EINVAL)
 				return
 			}
-			// The copy is thrown away with the pass; any number at or
-			// above arg will do.
-			s.R0 = uintptr(max(arg, 100))
+			// The copy is thrown away with the pass, but the pass may compare
+			// copies: each gets its own number at or above arg.
+			noMachineDupsMu.Lock()
+			defer noMachineDupsMu.Unlock()
+			newFd := max(arg, 100)
+			for noMachineDups[newFd] {
+				newFd++
+			}
+			if newFd >= maxFds {
+				s.Errno = uintptr(syscall.EMFILE)
+				return
+			}
+			noMachineDups[newFd] = true
+			s.R0 = uintptr(newFd)
 			s.Errno = 0
 			return
 		}

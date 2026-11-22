@@ -509,6 +509,33 @@ func TestDupMinimum(t *testing.T) {
 			t.Errorf("minimum %d: got %v, want EINVAL", min, err)
 		}
 	}
+	if !gosim.IsSim() {
+		return
+	}
+	// In a simulation the machine's descriptors are known: 3 and 4 are
+	// free, and the last one below the limit is 2^20-1, once.
+	fd3, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 3)
+	if err != nil || fd3 != 3 {
+		t.Errorf("minimum 3: got %d, %v", fd3, err)
+	}
+	defer unix.Close(fd3)
+	last, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 1<<20-1)
+	if err != nil || last != 1<<20-1 {
+		t.Errorf("minimum 2^20-1: got %d, %v", last, err)
+	}
+	defer unix.Close(last)
+	if fd, err := unix.FcntlInt(1, unix.F_DUPFD_CLOEXEC, 1<<20-1); err != unix.EMFILE {
+		t.Errorf("minimum 2^20-1 again: got %d, %v; want EMFILE", fd, err)
+	}
+	// An open after the high dup gets a low descriptor.
+	f, err := os.OpenFile("dup", os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if f.Fd() >= 1<<20 {
+		t.Errorf("an open got descriptor %d", f.Fd())
+	}
 }
 
 var lenSource = [3]int{1, 2, 3}
@@ -528,5 +555,31 @@ func TestGlobalSizedByLen(t *testing.T) {
 	var local [len(lenSource)]byte
 	if cap(local) != 3 {
 		t.Errorf("got %d", cap(local))
+	}
+}
+
+// lenNilDeref takes len of an array literal of a global and a nil
+// dereference: Go does not evaluate the operand, so nothing panics.
+func lenNilDeref() int {
+	var p *int
+	return len([2]int{*p, lenSource[0]})
+}
+
+// lenConstWithLocal declares a constant from len of a local and a global.
+func lenConstWithLocal() int {
+	v := 1
+	const n = len([2]int{v, lenSource[0]})
+	return n
+}
+
+// capUnderLocalLen takes cap of a global array where a local hides len.
+func capUnderLocalLen() int {
+	len := 42
+	return cap(lenSource) + len
+}
+
+func TestConstantLenOperands(t *testing.T) {
+	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen()}; !slices.Equal(got, []int{2, 2, 45}) {
+		t.Errorf("got %v", got)
 	}
 }

@@ -413,14 +413,15 @@ func isStdPackage(pkgPath string) bool {
 // an array x, with a constant that translation keeps constant, where
 // translation would make x non-constant: when x names a package-level
 // variable, which gosim moves into the package's globals, or holds a map
-// literal or map index, which become calls. An array length or a const
-// declaration needs the constant. Go does not evaluate x in such a call,
-// so nothing is lost, except where x uses a local variable: folding would
-// leave the local unused, so such an x stays.
+// literal or map index, which become calls. Go does not evaluate x in such
+// a call, so nothing is lost; left alone, the translated x would be
+// evaluated, and could panic, and an array length or a const declaration
+// would not compile.
 //
-// The constant is len([N]struct{}{}), which is of type int, as len(x) is,
-// and names nothing that a local declaration could hide: len resolves to
-// the builtin here, since the call being replaced uses it.
+// The constant is len([N]struct{}{}), with the call's own builtin, len or
+// cap, which resolves to the builtin here and names nothing a local could
+// hide. The local variables that x uses stay used, in a term that is zero
+// and evaluates nothing: + 0*len([K]interface{}{v1, ..., vK}).
 func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	call, ok := c.Node().(*dst.CallExpr)
 	if !ok || !(t.isNamedBuiltIn(call.Fun, "len") || t.isNamedBuiltIn(call.Fun, "cap")) {
@@ -434,24 +435,46 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 	if !ok || tv.Value == nil {
 		return
 	}
-	if becomesCall, usesLocal := t.lenOperand(astCall.Args[0]); !becomesCall || usesLocal {
+	becomesCall, locals := t.lenOperand(astCall.Args[0])
+	if !becomesCall {
 		return
 	}
-	c.Replace(&dst.CallExpr{
-		Fun: dst.NewIdent("len"),
-		Args: []dst.Expr{&dst.CompositeLit{
-			Type: &dst.ArrayType{
-				Len: &dst.BasicLit{Kind: token.INT, Value: tv.Value.ExactString()},
-				Elt: &dst.StructType{Fields: &dst.FieldList{Opening: true, Closing: true}},
+	builtin := call.Fun.(*dst.Ident).Name
+	array := func(n string, elt dst.Expr, elts []dst.Expr) dst.Expr {
+		return &dst.CallExpr{
+			Fun: dst.NewIdent(builtin),
+			Args: []dst.Expr{&dst.CompositeLit{
+				Type: &dst.ArrayType{Len: &dst.BasicLit{Kind: token.INT, Value: n}, Elt: elt},
+				Elts: elts,
+			}},
+		}
+	}
+	var folded dst.Expr = array(tv.Value.ExactString(), &dst.StructType{Fields: &dst.FieldList{Opening: true, Closing: true}}, nil)
+	if len(locals) > 0 {
+		var uses []dst.Expr
+		for _, name := range locals {
+			uses = append(uses, dst.NewIdent(name))
+		}
+		folded = &dst.BinaryExpr{
+			X:  folded,
+			Op: token.ADD,
+			Y: &dst.BinaryExpr{
+				X:  &dst.BasicLit{Kind: token.INT, Value: "0"},
+				Op: token.MUL,
+				Y:  array(fmt.Sprint(len(locals)), &dst.InterfaceType{Methods: &dst.FieldList{Opening: true, Closing: true}}, uses),
 			},
-		}},
-		Decs: dst.CallExprDecorations{NodeDecs: call.Decs.NodeDecs},
-	})
+		}
+		folded = &dst.ParenExpr{X: folded}
+	}
+	folded.Decorations().Start = call.Decs.NodeDecs.Start
+	folded.Decorations().End = call.Decs.NodeDecs.End
+	c.Replace(folded)
 }
 
 // lenOperand reports whether translation makes expr non-constant, as
-// rewriteConstantLen describes, and whether expr uses a local variable.
-func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall, usesLocal bool) {
+// rewriteConstantLen describes, and the local variables that expr uses,
+// each once, in order.
+func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall bool, locals []string) {
 	isMap := func(e ast.Expr) bool {
 		typ := t.typesInfo.TypeOf(e)
 		if typ == nil {
@@ -466,8 +489,8 @@ func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall, usesLocal bo
 			if v, ok := t.typesInfo.Uses[n].(*types.Var); ok && !v.IsField() && v.Pkg() != nil {
 				if v.Parent() == v.Pkg().Scope() {
 					becomesCall = true
-				} else {
-					usesLocal = true
+				} else if !slices.Contains(locals, n.Name) {
+					locals = append(locals, n.Name)
 				}
 			}
 		case *ast.CompositeLit:
@@ -481,7 +504,7 @@ func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall, usesLocal bo
 		}
 		return true
 	})
-	return becomesCall, usesLocal
+	return becomesCall, locals
 }
 
 // rewriteEmbedFS wraps an embed.FS that is converted to an interface of
