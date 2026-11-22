@@ -578,8 +578,16 @@ func capUnderLocalLen() int {
 	return cap(lenSource) + len
 }
 
+// Constants of len of nil maps and channels, which translation turns into
+// calls.
+const (
+	lenNilMap     = len([1]map[int]int{nil})
+	lenNilChan    = len([1]chan int{nil})
+	lenNilMapConv = len([1]map[int]int{map[int]int(nil)})
+)
+
 func TestConstantLenOperands(t *testing.T) {
-	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen()}; !slices.Equal(got, []int{2, 2, 45}) {
+	if got := []int{lenNilDeref(), lenConstWithLocal(), capUnderLocalLen(), lenNilMap, lenNilChan, lenNilMapConv}; !slices.Equal(got, []int{2, 2, 45, 1, 1, 1}) {
 		t.Errorf("got %v", got)
 	}
 }

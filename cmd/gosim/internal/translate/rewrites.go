@@ -413,7 +413,7 @@ func isStdPackage(pkgPath string) bool {
 // an array x, with a constant that translation keeps constant, where
 // translation would make x non-constant: when x names a package-level
 // variable, which gosim moves into the package's globals, or holds a map
-// literal or map index, which become calls. Go does not evaluate x in such
+// or channel value, which becomes a call (lenOperand). Go does not evaluate x in such
 // a call, so nothing is lost; left alone, the translated x would be
 // evaluated, and could panic, and an array length or a const declaration
 // would not compile.
@@ -473,33 +473,43 @@ func (t *packageTranslator) rewriteConstantLen(c *dstutil.Cursor) {
 
 // lenOperand reports whether translation makes expr non-constant, as
 // rewriteConstantLen describes, and the local variables that expr uses,
-// each once, in order.
+// each once, in order. gosim translates every value of a map or channel
+// type, a nil one too, into a call; an element of such a type in a
+// composite literal may be an untyped nil, so the literal's element type
+// counts as well.
 func (t *packageTranslator) lenOperand(expr ast.Expr) (becomesCall bool, locals []string) {
-	isMap := func(e ast.Expr) bool {
-		typ := t.typesInfo.TypeOf(e)
+	isMapOrChan := func(typ types.Type) bool {
 		if typ == nil {
 			return false
 		}
-		_, ok := typ.Underlying().(*types.Map)
-		return ok
+		switch typ.Underlying().(type) {
+		case *types.Map, *types.Chan:
+			return true
+		}
+		return false
 	}
 	ast.Inspect(expr, func(n ast.Node) bool {
-		switch n := n.(type) {
+		e, ok := n.(ast.Expr)
+		if !ok {
+			return true
+		}
+		if tv, ok := t.typesInfo.Types[e]; ok && tv.IsValue() && isMapOrChan(tv.Type) {
+			becomesCall = true
+		}
+		switch e := e.(type) {
 		case *ast.Ident:
-			if v, ok := t.typesInfo.Uses[n].(*types.Var); ok && !v.IsField() && v.Pkg() != nil {
+			if v, ok := t.typesInfo.Uses[e].(*types.Var); ok && !v.IsField() && v.Pkg() != nil {
 				if v.Parent() == v.Pkg().Scope() {
 					becomesCall = true
-				} else if !slices.Contains(locals, n.Name) {
-					locals = append(locals, n.Name)
+				} else if !slices.Contains(locals, e.Name) {
+					locals = append(locals, e.Name)
 				}
 			}
 		case *ast.CompositeLit:
-			if isMap(n) {
-				becomesCall = true
-			}
-		case *ast.IndexExpr:
-			if isMap(n.X) {
-				becomesCall = true
+			if typ := t.typesInfo.TypeOf(e); typ != nil && len(e.Elts) > 0 {
+				if elems, ok := typ.Underlying().(interface{ Elem() types.Type }); ok && isMapOrChan(elems.Elem()) {
+					becomesCall = true
+				}
 			}
 		}
 		return true
