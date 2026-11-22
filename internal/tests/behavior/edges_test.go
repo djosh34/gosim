@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -689,21 +690,22 @@ func TestFoldKeepsInit(t *testing.T) {
 // TestExistsErrors makes a file with O_EXCL and a directory that already
 // exist: both fail with EEXIST, as on Linux, and the run goes on.
 func TestExistsErrors(t *testing.T) {
-	setupRealDisk(t)
-	f, err := os.OpenFile("exists", os.O_CREATE|os.O_WRONLY, 0o644)
+	dir := t.TempDir()
+	file, sub := filepath.Join(dir, "exists"), filepath.Join(dir, "existsdir")
+	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.OpenFile("exists", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644); !errors.Is(err, syscall.EEXIST) {
+	if _, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644); !errors.Is(err, syscall.EEXIST) {
 		t.Errorf("O_EXCL of an existing file: got %v, want EEXIST", err)
 	}
-	if err := os.Mkdir("existsdir", 0o755); err != nil {
+	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir("existsdir", 0o755); !errors.Is(err, syscall.EEXIST) {
+	if err := os.Mkdir(sub, 0o755); !errors.Is(err, syscall.EEXIST) {
 		t.Errorf("mkdir of an existing directory: got %v, want EEXIST", err)
 	}
 }
