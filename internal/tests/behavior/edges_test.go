@@ -363,3 +363,42 @@ func TestNilChanLen(t *testing.T) {
 		t.Errorf("len %d, cap %d", len(ch), cap(ch))
 	}
 }
+
+// TestReadDirInfo lists a directory with the files' details, which stats
+// each entry relative to the open directory, as CockroachDB does with
+// ioutil.ReadDir.
+func TestReadDirInfo(t *testing.T) {
+	setupRealDisk(t)
+	if err := os.MkdirAll("d/sub", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("d/file", []byte("12345"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open("d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	infos, err := f.Readdir(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sizes := map[string]int64{}
+	for _, info := range infos {
+		if info.IsDir() {
+			sizes[info.Name()] = -1
+		} else {
+			sizes[info.Name()] = info.Size()
+		}
+	}
+	if len(sizes) != 2 || sizes["file"] != 5 || sizes["sub"] != -1 {
+		t.Errorf("got %v", sizes)
+	}
+	if err := os.RemoveAll("d"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat("d"); !os.IsNotExist(err) {
+		t.Errorf("d after RemoveAll: %v", err)
+	}
+}

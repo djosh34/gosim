@@ -61,6 +61,7 @@ var hooksGo127 = map[packageSelector]packageSelector{
 
 	{Pkg: "internal/runtime/syscall/linux", Selector: "Syscall6"}: {Pkg: hooksGo127Package},
 
+	{Pkg: "internal/syscall/unix", Selector: "Fstatat"}:   {Pkg: hooksGo127Package},
 	{Pkg: "internal/syscall/unix", Selector: "GetRandom"}: {Pkg: hooksGo127Package},
 	{Pkg: "internal/syscall/unix", Selector: "fcntl"}:     {Pkg: hooksGo127Package},
 	{Pkg: "internal/syscall/unix", Selector: "Openat"}:    {Pkg: hooksGo127Package},

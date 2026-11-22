@@ -25,7 +25,11 @@
 >   `go:linkname`, as Pebble does; gosim gives them hooks. `mallocgc` is
 >   only for memory without pointers, with a nil type.
 > - `chmod` and `fchmod` accept any mode of a file that exists, since the
->   simulated file system keeps no permissions.
+>   simulated file system keeps no permissions. Calls that take a
+>   directory's file descriptor, such as `os.File.ReadDir`'s `fstatat`
+>   and `os.RemoveAll`'s `openat` and `unlinkat`, resolve paths from that
+>   directory; `O_APPEND` writes at the end, and `O_NOFOLLOW` and
+>   `AT_SYMLINK_NOFOLLOW` change nothing, as there are no symbolic links.
 > - `statfs` and `fstatfs` report a file system of 1 TiB, all of it free;
 >   `fadvise64` accepts any valid advice and ignores it; `fcntl` record
 >   locks, through `syscall` or `golang.org/x/sys/unix`, are always granted,

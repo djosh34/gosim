@@ -300,11 +300,21 @@ type Socket struct {
 	// tcp conn
 }
 
+// dirInodeForFd returns the directory that paths relative to dirfd start
+// from: the working directory for AT_FDCWD, or an open directory, as
+// os.File.ReadDir and os.RemoveAll use.
 func (l *LinuxOS) dirInodeForFd(dirfd int) (int, error) {
-	if dirfd != _AT_FDCWD {
-		return 0, syscall.EINVAL // XXX?
+	if dirfd == _AT_FDCWD {
+		return l.workdirInode, nil
 	}
-	return l.workdirInode, nil
+	f, ok := l.files[dirfd].(*OsFile)
+	if !ok {
+		return 0, syscall.EBADF
+	}
+	if !l.isDir(f.inode) {
+		return 0, syscall.ENOTDIR
+	}
+	return f.inode, nil
 }
 
 func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invocation *syscallabi.Syscall) (int, error) {
@@ -321,6 +331,9 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 
 	// just get rid of this
 	flags &= ^syscall.O_CLOEXEC
+	// There are no symbolic links, so O_NOFOLLOW changes nothing:
+	// os.RemoveAll opens directories with it.
+	flags &= ^syscall.O_NOFOLLOW
 
 	// O_DIRECTORY fails unless path is a directory. Go's os package sets it
 	// when it opens a directory to read it.
