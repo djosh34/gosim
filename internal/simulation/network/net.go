@@ -114,23 +114,25 @@ func (e *Endpoint) enqueueLocked(packet *Packet) {
 }
 
 // dropHeld drops the packets held on a cut link that e sent on the stream
-// id. A stream that gives up stops resending, so they never arrive.
-func (e *Endpoint) dropHeld(id ConnId) {
+// id, and reports whether there were any. A stream that gives up stops
+// resending, so they never arrive.
+func (e *Endpoint) dropHeld(id ConnId) bool {
 	e.net.mu.Lock()
 	defer e.net.mu.Unlock()
 
 	held, ok := e.net.held[id.Hosts]
 	if !ok {
-		return
+		return false
 	}
 	// DeleteFunc clears the slots it frees, so the dropped packets, and the
 	// buffers an open carries, can be collected.
-	held = slices.DeleteFunc(held, func(packet *Packet) bool { return packet.ConnId == id })
-	if len(held) == 0 {
+	kept := slices.DeleteFunc(held, func(packet *Packet) bool { return packet.ConnId == id })
+	if len(kept) == 0 {
 		delete(e.net.held, id.Hosts)
 	} else {
-		e.net.held[id.Hosts] = held
+		e.net.held[id.Hosts] = kept
 	}
+	return len(kept) < len(held)
 }
 
 type Network struct {
