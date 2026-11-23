@@ -2,6 +2,7 @@ package network
 
 import (
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 )
@@ -122,18 +123,13 @@ func (e *Endpoint) DropHeld(id ConnId) {
 	if !ok {
 		return
 	}
-	kept := held[:0]
-	for _, packet := range held {
-		if packet.ConnId != id {
-			kept = append(kept, packet)
-		}
-	}
-	// Let the dropped packets, and the buffers an open carries, be collected.
-	clear(held[len(kept):])
-	if len(kept) == 0 {
+	// DeleteFunc clears the slots it frees, so the dropped packets, and the
+	// buffers an open carries, can be collected.
+	held = slices.DeleteFunc(held, func(packet *Packet) bool { return packet.ConnId == id })
+	if len(held) == 0 {
 		delete(e.net.held, id.Hosts)
 	} else {
-		e.net.held[id.Hosts] = kept
+		e.net.held[id.Hosts] = held
 	}
 }
 
