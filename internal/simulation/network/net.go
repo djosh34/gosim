@@ -113,9 +113,9 @@ func (e *Endpoint) enqueueLocked(packet *Packet) {
 	e.net.queue.enqueue(packet)
 }
 
-// DropHeld drops the packets held on a cut link that e sent on the stream
+// dropHeld drops the packets held on a cut link that e sent on the stream
 // id. A stream that gives up stops resending, so they never arrive.
-func (e *Endpoint) DropHeld(id ConnId) {
+func (e *Endpoint) dropHeld(id ConnId) {
 	e.net.mu.Lock()
 	defer e.net.mu.Unlock()
 
@@ -174,12 +174,10 @@ func (n *Network) SetConnected(p HostPair, connected bool) {
 		for _, d := range []HostPair{p, p.Flip()} {
 			held := n.held[d]
 			delete(n.held, d)
-			src, ok := n.endpoints[d.SourceHost]
-			if !ok {
-				continue
-			}
+			// The sender is attached: DetachStack drops a machine's held
+			// packets.
 			for _, packet := range held {
-				src.enqueueLocked(packet)
+				n.endpoints[d.SourceHost].enqueueLocked(packet)
 			}
 		}
 	}

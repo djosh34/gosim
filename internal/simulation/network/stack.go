@@ -353,7 +353,7 @@ func (n *Stack) CloseListener(listener *Listener) error {
 // giveUp closes a stream that timed out. Like TCP when it gives up, it
 // stops resending what is held on a cut link, so that never arrives.
 func (n *Stack) giveUp(stream *Stream) {
-	n.endpoint.DropHeld(stream.id)
+	n.endpoint.dropHeld(stream.id)
 	n.closeStream(stream, false)
 }
 
@@ -606,7 +606,7 @@ func (n *Stack) StreamClose(stream *Stream) error {
 		// A dial closed before it connected, as when its deadline passed:
 		// like TCP, it stops resending its open, so a listener never
 		// accepts it.
-		n.endpoint.DropHeld(stream.id)
+		n.endpoint.dropHeld(stream.id)
 	}
 	fin := allocPacket(PacketKindStreamFin, stream.id)
 	fin.Offset = stream.sendPos

@@ -207,3 +207,64 @@ func TestNetTcpPartitionDropsCrashedSender(t *testing.T) {
 	a.Crash()
 	b.Crash()
 }
+
+// TestNetTcpPartitionDropsToCrashedReceiver dials over a cut link, then
+// crashes and restarts the listener before the link is back. The listener
+// that crashed never got the dial, so the one that restarted does not
+// accept it, and the dial times out.
+func TestNetTcpPartitionDropsToCrashedReceiver(t *testing.T) {
+	var accepted, started atomic.Int32
+	var dialed atomic.Bool
+	gosimruntime.TestRaceToken.Release()
+	a := gosim.NewMachine(gosim.MachineConfig{
+		Label: "a",
+		Addr:  netip.MustParseAddr(aAddr),
+		MainFunc: func() {
+			gosimruntime.TestRaceToken.Acquire()
+			listener, err := net.Listen("tcp", aAddr+":1234")
+			if err != nil {
+				t.Fatal(err)
+			}
+			started.Add(1)
+			for {
+				if _, err := listener.Accept(); err != nil {
+					return
+				}
+				accepted.Add(1)
+			}
+		},
+	})
+	time.Sleep(time.Second)
+
+	gosim.SetConnected(aAddr, bAddr, false)
+	gosimruntime.TestRaceToken.Release()
+	b := gosim.NewMachine(gosim.MachineConfig{
+		Label: "b",
+		Addr:  netip.MustParseAddr(bAddr),
+		MainFunc: func() {
+			gosimruntime.TestRaceToken.Acquire()
+			if _, err := net.Dial("tcp", aAddr+":1234"); err == nil {
+				dialed.Store(true)
+			}
+		},
+	})
+
+	// Within the dial's one-second timeout: restart a, then reconnect.
+	time.Sleep(100 * time.Millisecond)
+	a.Crash()
+	gosimruntime.TestRaceToken.Release()
+	a.Restart()
+	for started.Load() < 2 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	gosim.SetConnected(aAddr, bAddr, true)
+
+	b.Wait()
+	if dialed.Load() {
+		t.Error("a dial sent to a machine that crashed connected")
+	}
+	if n := accepted.Load(); n != 0 {
+		t.Errorf("the restarted machine accepted %d connections", n)
+	}
+	a.Crash()
+}
