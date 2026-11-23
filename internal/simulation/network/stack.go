@@ -350,6 +350,13 @@ func (n *Stack) CloseListener(listener *Listener) error {
 	return nil
 }
 
+// giveUp closes a stream that timed out. Like TCP when it gives up, it
+// stops resending what is held on a cut link, so that never arrives.
+func (n *Stack) giveUp(stream *Stream) {
+	n.endpoint.dropHeld(stream.id)
+	n.closeStream(stream, false)
+}
+
 func (n *Stack) closeStream(stream *Stream, sendClose bool) error {
 	if stream.closed {
 		panic(stream)
@@ -514,7 +521,7 @@ func (n *Stack) resetAckFailedTimerLocked(s *Stream) {
 			// if s.ackPos != s.sendPos {
 			// stream.failureReason?
 			// stream.openFailed?
-			n.closeStream(s, false)
+			n.giveUp(s)
 			// }
 		})
 	} else {
@@ -579,7 +586,7 @@ func (n *Stack) OpenStream(addr netip.AddrPort) (*Stream, error) {
 		}
 		// stream.failureReason?
 		// stream.openFailed?
-		n.closeStream(stream, false)
+		n.giveUp(stream)
 	})
 
 	return stream, nil
@@ -595,9 +602,15 @@ func (n *Stack) StreamClose(stream *Stream) error {
 		return ErrStreamClosed
 	}
 
-	fin := allocPacket(PacketKindStreamFin, stream.id)
-	fin.Offset = stream.sendPos
-	n.endpoint.Send(fin)
+	// A dial closed before it connected, as when its deadline passed, stops
+	// resending its open, like TCP, so a listener never accepts it. If the
+	// open was still held, the peer never saw the stream, so it gets no Fin
+	// either; a stream sends nothing else before it is open.
+	if stream.opened || !n.endpoint.dropHeld(stream.id) {
+		fin := allocPacket(PacketKindStreamFin, stream.id)
+		fin.Offset = stream.sendPos
+		n.endpoint.Send(fin)
+	}
 	if err := n.closeStream(stream, false); err != nil {
 		return err
 	}

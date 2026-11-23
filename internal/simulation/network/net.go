@@ -2,6 +2,7 @@ package network
 
 import (
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 )
@@ -84,12 +85,20 @@ func (e *Endpoint) Send(packet *Packet) {
 	}
 
 	if e.net.disconnected[packet.ConnId.Hosts] {
+		// Hold the packet until the link reconnects, as TCP would resend it
+		// until it gets through.
+		e.net.held[packet.ConnId.Hosts] = append(e.net.held[packet.ConnId.Hosts], packet)
 		return
-		// XXX: silently fail -- but maybe fail loudly optionally? ENOPATH or something?
-		// return nil
-		// return errors.New("disconnected")
 	}
 
+	e.enqueueLocked(packet)
+}
+
+// enqueueLocked puts packet on the network to arrive after the link's delay,
+// after every packet e sent to the same host before it.
+//
+// Requires e.net.mu.
+func (e *Endpoint) enqueueLocked(packet *Packet) {
 	arrival := timeIndex{
 		time:  time.Now().Add(e.net.delay[packet.ConnId.Hosts]).UnixNano(),
 		index: 0,
@@ -104,6 +113,28 @@ func (e *Endpoint) Send(packet *Packet) {
 	e.net.queue.enqueue(packet)
 }
 
+// dropHeld drops the packets held on a cut link that e sent on the stream
+// id, and reports whether there were any. A stream that gives up stops
+// resending, so they never arrive.
+func (e *Endpoint) dropHeld(id ConnId) bool {
+	e.net.mu.Lock()
+	defer e.net.mu.Unlock()
+
+	held, ok := e.net.held[id.Hosts]
+	if !ok {
+		return false
+	}
+	// DeleteFunc clears the slots it frees, so the dropped packets, and the
+	// buffers an open carries, can be collected.
+	kept := slices.DeleteFunc(held, func(packet *Packet) bool { return packet.ConnId == id })
+	if len(kept) == 0 {
+		delete(e.net.held, id.Hosts)
+	} else {
+		e.net.held[id.Hosts] = kept
+	}
+	return len(kept) < len(held)
+}
+
 type Network struct {
 	mu        sync.Mutex
 	endpoints map[netip.Addr]*Endpoint
@@ -111,6 +142,9 @@ type Network struct {
 
 	disconnected map[HostPair]bool
 	delay        map[HostPair]time.Duration
+	// held keeps the packets sent over each direction of a cut link, in the
+	// order they were sent, until the link reconnects.
+	held map[HostPair][]*Packet
 
 	queue *delayQueue
 }
@@ -122,6 +156,7 @@ func NewNetwork() *Network {
 
 		disconnected: make(map[HostPair]bool),
 		delay:        make(map[HostPair]time.Duration),
+		held:         make(map[HostPair][]*Packet),
 
 		queue: newDelayQueue(),
 	}
@@ -137,6 +172,16 @@ func (n *Network) SetConnected(p HostPair, connected bool) {
 	} else {
 		delete(n.disconnected, p)
 		delete(n.disconnected, p.Flip())
+		// Deliver what was held, in order, after the link's delay.
+		for _, d := range []HostPair{p, p.Flip()} {
+			held := n.held[d]
+			delete(n.held, d)
+			// The sender is attached: DetachStack drops a machine's held
+			// packets.
+			for _, packet := range held {
+				n.endpoints[d.SourceHost].enqueueLocked(packet)
+			}
+		}
 	}
 }
 
@@ -194,6 +239,14 @@ func (n *Network) DetachStack(stack *Stack) {
 
 	endpoint.closed = true
 	delete(n.endpoints, stack.endpoint.addr)
+
+	// A machine that stops neither resends what it sent nor receives what was
+	// sent to it, so drop the packets held to and from it.
+	for d := range n.held {
+		if d.SourceHost == endpoint.addr || d.DestHost == endpoint.addr {
+			delete(n.held, d)
+		}
+	}
 	stack.setEndpoint(nil) // XXX: good idea?
 }
 

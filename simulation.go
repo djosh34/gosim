@@ -63,7 +63,13 @@ func (s Simulation) SetSimulationTimeout(timeout time.Duration) {
 
 // SetConnected configures the network connectivity between addresses a and b.
 //
-// TODO: How will this fail? Unrouteable or rejected
+// While a and b are disconnected, the packets they send each other are held,
+// as TCP would resend them, and arrive in order once they are connected
+// again, so a connection that does not time out meanwhile goes on where it
+// was. A connection that times out stops resending, and a machine that
+// crashes or stops neither resends nor receives: their held packets are
+// dropped.
+//
 // TODO: Support asymmetry
 func SetConnected(a, b string, connected bool) error {
 	return simulation.SyscallSetConnected(a, b, connected)
