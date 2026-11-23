@@ -350,6 +350,13 @@ func (n *Stack) CloseListener(listener *Listener) error {
 	return nil
 }
 
+// giveUp closes a stream that timed out. Like TCP when it gives up, it
+// stops resending what is held on a cut link, so that never arrives.
+func (n *Stack) giveUp(stream *Stream) {
+	n.endpoint.DropHeld(stream.id)
+	n.closeStream(stream, false)
+}
+
 func (n *Stack) closeStream(stream *Stream, sendClose bool) error {
 	if stream.closed {
 		panic(stream)
@@ -514,7 +521,7 @@ func (n *Stack) resetAckFailedTimerLocked(s *Stream) {
 			// if s.ackPos != s.sendPos {
 			// stream.failureReason?
 			// stream.openFailed?
-			n.closeStream(s, false)
+			n.giveUp(s)
 			// }
 		})
 	} else {
@@ -579,7 +586,7 @@ func (n *Stack) OpenStream(addr netip.AddrPort) (*Stream, error) {
 		}
 		// stream.failureReason?
 		// stream.openFailed?
-		n.closeStream(stream, false)
+		n.giveUp(stream)
 	})
 
 	return stream, nil
