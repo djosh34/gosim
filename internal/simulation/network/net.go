@@ -128,6 +128,8 @@ func (e *Endpoint) DropHeld(id ConnId) {
 			kept = append(kept, packet)
 		}
 	}
+	// Let the dropped packets, and the buffers an open carries, be collected.
+	clear(held[len(kept):])
 	if len(kept) == 0 {
 		delete(e.net.held, id.Hosts)
 	} else {

@@ -3,9 +3,11 @@
 package behavior_test
 
 import (
+	"errors"
 	"io"
 	"net"
 	"net/netip"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,9 +42,10 @@ func echoServer(t *testing.T, addr string) {
 	}
 }
 
-// TestNetTcpPartitionHoldsPackets writes over a connection while its link is
-// cut, for less than the connection's timeout. As with TCP, the bytes arrive
-// once the link is back, and the connection goes on.
+// TestNetTcpPartitionHoldsPackets writes twice over a connection while its
+// link is cut, for less than the connection's timeout. Nothing arrives while
+// the link is cut; as with TCP, the bytes arrive in order once it is back, and
+// the connection goes on.
 func TestNetTcpPartitionHoldsPackets(t *testing.T) {
 	gosim.NewMachine(gosim.MachineConfig{
 		Label:    "a",
@@ -60,18 +63,24 @@ func TestNetTcpPartitionHoldsPackets(t *testing.T) {
 			}
 
 			gosim.SetConnected(aAddr, bAddr, false)
-			if _, err := conn.Write([]byte("hello")); err != nil {
-				t.Fatal(err)
+			for _, chunk := range []string{"hello", "world"} {
+				if _, err := conn.Write([]byte(chunk)); err != nil {
+					t.Fatal(err)
+				}
 			}
-			time.Sleep(2 * time.Second)
+			conn.SetReadDeadline(time.Now().Add(time.Second))
+			resp := make([]byte, 10)
+			if n, err := conn.Read(resp); n != 0 || !errors.Is(err, os.ErrDeadlineExceeded) {
+				t.Fatal("read over a cut link:", n, err)
+			}
+			time.Sleep(time.Second)
 			gosim.SetConnected(aAddr, bAddr, true)
 
 			conn.SetReadDeadline(time.Now().Add(time.Second))
-			resp := make([]byte, 5)
 			if _, err := io.ReadFull(conn, resp); err != nil {
 				t.Fatal(err)
 			}
-			if string(resp) != "hello" {
+			if string(resp) != "helloworld" {
 				t.Fatal(string(resp))
 			}
 		},
@@ -79,9 +88,10 @@ func TestNetTcpPartitionHoldsPackets(t *testing.T) {
 	b.Wait()
 }
 
-// TestNetTcpPartitionDropsGivenUpDial dials over a cut link. The dial times
-// out, and once the link is back the listener accepts no connection for it:
-// a connection that gave up does not resend.
+// TestNetTcpPartitionDropsGivenUpDial dials over a cut link twice: once
+// until the stack's open times out, once with a shorter deadline of its own.
+// Both dials fail, and once the link is back the listener accepts no
+// connection for them: a connection that gave up does not resend.
 func TestNetTcpPartitionDropsGivenUpDial(t *testing.T) {
 	var accepted atomic.Int32
 	gosimruntime.TestRaceToken.Release()
@@ -110,6 +120,9 @@ func TestNetTcpPartitionDropsGivenUpDial(t *testing.T) {
 			gosim.SetConnected(aAddr, bAddr, false)
 			if _, err := net.Dial("tcp", aAddr+":1234"); err == nil {
 				t.Fatal("dial over a cut link worked")
+			}
+			if _, err := net.DialTimeout("tcp", aAddr+":1234", 100*time.Millisecond); err == nil {
+				t.Fatal("dial with a deadline over a cut link worked")
 			}
 			gosim.SetConnected(aAddr, bAddr, true)
 			time.Sleep(time.Second)

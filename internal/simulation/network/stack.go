@@ -602,6 +602,12 @@ func (n *Stack) StreamClose(stream *Stream) error {
 		return ErrStreamClosed
 	}
 
+	if !stream.opened {
+		// A dial closed before it connected, as when its deadline passed:
+		// like TCP, it stops resending its open, so a listener never
+		// accepts it.
+		n.endpoint.DropHeld(stream.id)
+	}
 	fin := allocPacket(PacketKindStreamFin, stream.id)
 	fin.Offset = stream.sendPos
 	n.endpoint.Send(fin)
