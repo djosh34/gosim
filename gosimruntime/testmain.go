@@ -35,10 +35,6 @@ func SetAllTests(tests []Test) {
 
 var metatest = flag.Bool("metatest", false, "")
 
-// killMu is held by the kill of a run that passed a limit, until the binary
-// ends.
-var killMu sync.Mutex
-
 // Copied in metatesting.RunConfig. Keep in sync.
 type runConfig struct {
 	Test      string
@@ -251,9 +247,10 @@ func TestMain(rt Runtime) {
 		// A run that passed WallKill or CPUKill is reported with what it
 		// saved and logged so far and every goroutine's stack, and the
 		// binary ends.
+		// Should both limits pass at once, the second kill waits on killMu
+		// until the binary ends.
+		var killMu sync.Mutex
 		kill := func(err string) {
-			// Should both limits pass at once, the second waits here until
-			// the binary ends.
 			killMu.Lock()
 			artifacts, logOutput := soFar()
 			if artifacts == nil {

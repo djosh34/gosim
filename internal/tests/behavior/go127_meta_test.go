@@ -3,11 +3,14 @@
 package behavior_test
 
 import (
+	"bytes"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -83,6 +86,91 @@ func TestCPUKill(t *testing.T) {
 	if err != nil || !run.Failed || run.Ended || !strings.Contains(run.Err, "TestCPUTime with seed 1 passed its limit of 1ns of CPU time") {
 		t.Errorf("a run past its limit as it ends: %v, failed %v, ended %v, err %q", err, run != nil && run.Failed, run != nil && run.Ended, run.Err)
 	}
+}
+
+// TestCPUKillStarved stops the process of a run that uses 2 s of CPU time
+// for 6 s of real time, past its limit of 4 s of CPU time. A starved run
+// uses no CPU time while it waits, so it is not killed, as a limit of real
+// time would kill it, and it passes.
+func TestCPUKillStarved(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	var run *metatesting.RunResult
+	var err error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		run, err = mt.RunQuiet(&metatesting.RunConfig{Test: "TestCPUFor", Seed: 1, ExtraEnv: []string{"TESTINGCPUFOR=1"}, CPUKill: 4 * time.Second, WallKill: time.Hour})
+	}()
+	// Stop the test binary once its run spins.
+	pid := metatestChild(t)
+	for start := procCPU(t, pid); procCPU(t, pid)-start < 500*time.Millisecond; {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := syscall.Kill(pid, syscall.SIGSTOP); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(6 * time.Second)
+	select {
+	case <-done:
+		t.Fatal("the run ended before its process was stopped")
+	default:
+	}
+	if err := syscall.Kill(pid, syscall.SIGCONT); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if err != nil || run.Failed || run.Ended {
+		t.Errorf("a starved run: %v, %+v", err, run)
+	}
+}
+
+// procStat returns the fields of /proc/<pid>/stat after the command, which
+// is in parentheses: the state, the parent's pid, and so on.
+func procStat(pid int) []string {
+	stat, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))
+}
+
+// procCPU returns the CPU time the process pid used so far.
+func procCPU(t *testing.T, pid int) time.Duration {
+	f := procStat(pid)
+	if len(f) < 13 {
+		t.Fatalf("no process %d", pid)
+	}
+	// utime and stime, in clock ticks of 1/100 s.
+	utime, _ := strconv.ParseInt(f[11], 10, 64)
+	stime, _ := strconv.ParseInt(f[12], 10, 64)
+	return time.Duration(utime+stime) * 10 * time.Millisecond
+}
+
+// metatestChild waits for a running child of this process that is a
+// metatest binary, and returns its pid.
+func metatestChild(t *testing.T) int {
+	self := strconv.Itoa(os.Getpid())
+	for deadline := time.Now().Add(time.Minute); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		procs, err := os.ReadDir("/proc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range procs {
+			pid, err := strconv.Atoi(p.Name())
+			if err != nil {
+				continue
+			}
+			f := procStat(pid)
+			if len(f) < 2 || f[0] == "Z" || f[1] != self {
+				continue
+			}
+			if cmd, err := os.ReadFile(filepath.Join("/proc", p.Name(), "cmdline")); err == nil && bytes.Contains(cmd, []byte("-metatest")) {
+				return pid
+			}
+		}
+	}
+	t.Fatal("no metatest binary runs under this process")
+	return 0
 }
 
 func TestReflectLinkname(t *testing.T) {

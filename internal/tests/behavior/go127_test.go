@@ -295,6 +295,27 @@ func TestWallLimit(t *testing.T) {
 	gosim.WriteArtifact("stacks", gosim.Stacks())
 }
 
+// TestCPUFor uses 2 s of CPU time and passes; TestCPUKillStarved stops
+// its process on the way.
+func TestCPUFor(t *testing.T) {
+	if os.Getenv("TESTINGCPUFOR") != "1" {
+		t.Skip()
+	}
+	start, err := gosim.CPUTime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		now, err := gosim.CPUTime()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if now-start >= 2*time.Second {
+			return
+		}
+	}
+}
+
 // TestWallKill saves an artifact, then never yields, so only its second
 // limit of real time ends it.
 func TestWallKill(t *testing.T) {
