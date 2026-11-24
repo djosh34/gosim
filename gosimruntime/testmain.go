@@ -251,7 +251,7 @@ func TestMain(rt Runtime) {
 		// A run that passed WallKill or CPUKill is reported with what it
 		// saved and logged so far and every goroutine's stack, and the
 		// binary ends.
-		kill := func(limit string) {
+		kill := func(err string) {
 			// Should both limits pass at once, the second waits here until
 			// the binary ends.
 			killMu.Lock()
@@ -263,7 +263,7 @@ func TestMain(rt Runtime) {
 			metaResult := runResult{
 				Seed:      seed,
 				Failed:    true,
-				Err:       fmt.Sprintf("the run of %s with seed %d passed its limit of %s without yielding; the stack of every goroutine is in the artifact gosim-stacks.txt", req.Test, seed, limit),
+				Err:       fmt.Sprintf("the run of %s with seed %d %s; the stack of every goroutine is in the artifact gosim-stacks.txt", req.Test, seed, err),
 				LogOutput: logOutput,
 				Artifacts: artifacts,
 				Ended:     true,
@@ -274,11 +274,9 @@ func TestMain(rt Runtime) {
 			os.Exit(2)
 		}
 		stopWall := startWallLimit(req.WallLimit, req.WallKill, func() {
-			kill(fmt.Sprintf("%v of real time", req.WallKill))
+			kill(fmt.Sprintf("passed its limit of %v of real time without yielding", req.WallKill))
 		})
-		stopCPU := startCPULimit(req.CPUKill, func() {
-			kill(fmt.Sprintf("%v of CPU time", req.CPUKill))
-		})
+		stopCPU := startCPULimit(req.CPUKill, kill)
 		result := run(func() {
 			// TODO: add an entrypoint that takes a single test?
 			// TODO: fail gracefully with non-existent tests?
@@ -292,7 +290,7 @@ func TestMain(rt Runtime) {
 				SetAbortError(ErrTestFailed)
 			}
 		}, seed, enableTracer, captureLog, logLevelOverride, io.Discard, req.ExtraEnv)
-		stopCPU()
+		pastCPU := stopCPU()
 		stopWall()
 
 		metaResult := runResult{
@@ -304,6 +302,11 @@ func TestMain(rt Runtime) {
 		}
 		if result.Err != nil {
 			metaResult.Err = result.Err.Error()
+		}
+		if pastCPU != "" && !metaResult.Failed {
+			// The run passed its limit of CPU time between two checks.
+			metaResult.Failed = true
+			metaResult.Err = fmt.Sprintf("the run of %s with seed %d %s", req.Test, seed, pastCPU)
 		}
 
 		if err := out.Encode(metaResult); err != nil {

@@ -1,6 +1,8 @@
 package gosimruntime
 
 import (
+	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,11 +20,11 @@ func fakeCPU(t *testing.T) *atomic.Int64 {
 }
 
 // TestCPULimitPassed checks that a run that uses its limit of CPU time is
-// killed.
+// killed, and not before.
 func TestCPULimitPassed(t *testing.T) {
 	ns := fakeCPU(t)
-	killed := make(chan struct{})
-	stop := startCPULimit(time.Second, func() { close(killed) })
+	killed := make(chan string, 1)
+	stop := startCPULimit(time.Second, func(why string) { killed <- why })
 	defer stop()
 	ns.Store(int64(999 * time.Millisecond))
 	select {
@@ -32,7 +34,10 @@ func TestCPULimitPassed(t *testing.T) {
 	}
 	ns.Store(int64(time.Second))
 	select {
-	case <-killed:
+	case why := <-killed:
+		if want := "passed its limit of 1s of CPU time"; why != want {
+			t.Errorf("killed because %q, want %q", why, want)
+		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("not killed after the limit")
 	}
@@ -44,12 +49,71 @@ func TestCPULimitStarved(t *testing.T) {
 	ns := fakeCPU(t)
 	ns.Store(int64(time.Hour))
 	killed := make(chan struct{})
-	stop := startCPULimit(time.Second, func() { close(killed) })
-	defer stop()
+	stop := startCPULimit(time.Second, func(string) { close(killed) })
 	select {
 	case <-killed:
 		t.Fatal("a starved run was killed")
 	case <-time.After(200 * time.Millisecond):
+	}
+	if past := stop(); past != "" {
+		t.Errorf("a starved run is past its limit: %s", past)
+	}
+}
+
+// TestCPULimitSleepingRun reads the real CPU time of the process: a run that
+// takes ten times its limit of CPU time in real time, but uses little CPU,
+// is neither killed nor past its limit when it ends. A limit of real time
+// would have killed it.
+func TestCPULimitSleepingRun(t *testing.T) {
+	old := cpuCheckInterval
+	cpuCheckInterval = 10 * time.Millisecond
+	defer func() { cpuCheckInterval = old }()
+	killed := make(chan struct{})
+	stop := startCPULimit(100*time.Millisecond, func(string) { close(killed) })
+	select {
+	case <-killed:
+		t.Fatal("a sleeping run was killed")
+	case <-time.After(time.Second):
+	}
+	if past := stop(); past != "" {
+		t.Errorf("a sleeping run is past its limit: %s", past)
+	}
+}
+
+// TestCPULimitPastAtStop checks that a run that passes its limit between
+// two checks is past it when it ends.
+func TestCPULimitPastAtStop(t *testing.T) {
+	ns := fakeCPU(t)
+	cpuCheckInterval = time.Hour
+	stop := startCPULimit(time.Second, func(string) { t.Error("killed between checks") })
+	ns.Store(int64(time.Second))
+	if past, want := stop(), "passed its limit of 1s of CPU time"; past != want {
+		t.Errorf("past its limit: %q, want %q", past, want)
+	}
+}
+
+// TestCPULimitReadError checks that a run whose CPU time cannot be read is
+// killed with the error rather than left without a limit.
+func TestCPULimitReadError(t *testing.T) {
+	fakeCPU(t)
+	var fail atomic.Bool
+	cpuTime = func() (int64, error) {
+		if fail.Load() {
+			return 0, errors.New("no rusage")
+		}
+		return 0, nil
+	}
+	killed := make(chan string, 1)
+	stop := startCPULimit(time.Second, func(why string) { killed <- why })
+	defer stop()
+	fail.Store(true)
+	select {
+	case why := <-killed:
+		if !strings.Contains(why, "its CPU time could not be read: no rusage") {
+			t.Errorf("killed because %q", why)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("not killed when the CPU time could not be read")
 	}
 }
 
@@ -59,7 +123,7 @@ func TestCPULimitStarved(t *testing.T) {
 func TestCPUStopWaitsForKill(t *testing.T) {
 	ns := fakeCPU(t)
 	started, release, stopped := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	stop := startCPULimit(time.Second, func() {
+	stop := startCPULimit(time.Second, func(string) {
 		close(started)
 		<-release
 	})
@@ -83,8 +147,10 @@ func TestCPUStopWaitsForKill(t *testing.T) {
 func TestCPUStopBeforeKill(t *testing.T) {
 	ns := fakeCPU(t)
 	killed := make(chan struct{})
-	stop := startCPULimit(time.Second, func() { close(killed) })
-	stop()
+	stop := startCPULimit(time.Second, func(string) { close(killed) })
+	if past := stop(); past != "" {
+		t.Errorf("past its limit at stop: %s", past)
+	}
 	ns.Store(int64(time.Hour))
 	select {
 	case <-killed:

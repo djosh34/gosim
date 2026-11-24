@@ -84,7 +84,10 @@ type MetaT struct {
 	dead error
 }
 
-var errEnded = errors.New("the test binary ended after its run passed RunConfig.WallKill or CPUKill")
+var (
+	errEnded    = errors.New("the test binary ended after its run passed RunConfig.WallKill")
+	errEndedCPU = errors.New("the test binary ended after its run passed RunConfig.CPUKill")
+)
 
 // fail ends the MetaT's test binary after err, and keeps ForOtherPackage
 // from handing out the MetaT again.
@@ -297,7 +300,12 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 		return nil, r.fail(err)
 	}
 	if result.Ended {
-		r.fail(errEnded)
+		// The runtime's error names the limit the run passed.
+		if strings.Contains(result.Err, " of CPU time") {
+			r.fail(errEndedCPU)
+		} else {
+			r.fail(errEnded)
+		}
 	}
 	return &result, nil
 }

@@ -67,14 +67,21 @@ func TestCPUKill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !run.Failed || !run.Ended || string(run.Artifacts["before.txt"]) != "saved" || !strings.Contains(string(run.Artifacts["gosim-stacks.txt"]), "TestWallKill") || !strings.Contains(run.Err, "TestWallKill with seed 1 passed its limit of 2s of CPU time") {
+	if !run.Failed || !run.Ended || string(run.Artifacts["before.txt"]) != "saved" || !strings.Contains(string(run.Artifacts["gosim-stacks.txt"]), "TestWallKill") || !strings.Contains(run.Err, "TestWallKill with seed 1 passed its limit of 2s of CPU time;") {
 		t.Errorf("got failed %v, ended %v, err %q, artifacts %q", run.Failed, run.Ended, run.Err, slices.Sorted(maps.Keys(run.Artifacts)))
 	}
 	// A run that ends well within its limit of CPU time passes, and a new
 	// test binary runs it.
-	run, err = metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1, CPUKill: time.Hour})
+	mt = metatesting.ForCurrentPackage(t)
+	run, err = mt.RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1, CPUKill: time.Hour})
 	if err != nil || run.Failed || string(run.Artifacts["artifact.txt"]) != "hello" {
 		t.Errorf("the next run: %v, %+v", err, run)
+	}
+	// TestCPUTime uses some CPU time and ends before the limit is checked:
+	// it fails as it ends, past its limit, and the binary goes on.
+	run, err = mt.RunQuiet(&metatesting.RunConfig{Test: "TestCPUTime", Seed: 1, CPUKill: time.Nanosecond})
+	if err != nil || !run.Failed || run.Ended || !strings.Contains(run.Err, "TestCPUTime with seed 1 passed its limit of 1ns of CPU time") {
+		t.Errorf("a run past its limit as it ends: %v, failed %v, ended %v, err %q", err, run != nil && run.Failed, run != nil && run.Ended, run.Err)
 	}
 }
 
