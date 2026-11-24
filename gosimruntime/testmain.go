@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,6 +35,10 @@ func SetAllTests(tests []Test) {
 
 var metatest = flag.Bool("metatest", false, "")
 
+// killMu is held by the kill of a run that passed a limit, until the binary
+// ends.
+var killMu sync.Mutex
+
 // Copied in metatesting.RunConfig. Keep in sync.
 type runConfig struct {
 	Test      string
@@ -42,6 +47,7 @@ type runConfig struct {
 	Simtrace  string
 	WallLimit time.Duration
 	WallKill  time.Duration
+	CPUKill   time.Duration
 }
 
 // Copied in metatesting.RunResult. Keep in sync.
@@ -242,9 +248,13 @@ func TestMain(rt Runtime) {
 			continue
 		}
 
-		// A run that passed WallKill is reported with what it saved and
-		// logged so far and every goroutine's stack, and the binary ends.
-		stopWall := startWallLimit(req.WallLimit, req.WallKill, func() {
+		// A run that passed WallKill or CPUKill is reported with what it
+		// saved and logged so far and every goroutine's stack, and the
+		// binary ends.
+		kill := func(limit string) {
+			// Should both limits pass at once, the second waits here until
+			// the binary ends.
+			killMu.Lock()
 			artifacts, logOutput := soFar()
 			if artifacts == nil {
 				artifacts = map[string][]byte{}
@@ -253,7 +263,7 @@ func TestMain(rt Runtime) {
 			metaResult := runResult{
 				Seed:      seed,
 				Failed:    true,
-				Err:       fmt.Sprintf("the run of %s with seed %d passed its limit of %v of real time without yielding; the stack of every goroutine is in the artifact gosim-stacks.txt", req.Test, seed, req.WallKill),
+				Err:       fmt.Sprintf("the run of %s with seed %d passed its limit of %s without yielding; the stack of every goroutine is in the artifact gosim-stacks.txt", req.Test, seed, limit),
 				LogOutput: logOutput,
 				Artifacts: artifacts,
 				Ended:     true,
@@ -262,6 +272,12 @@ func TestMain(rt Runtime) {
 				log.Print(err)
 			}
 			os.Exit(2)
+		}
+		stopWall := startWallLimit(req.WallLimit, req.WallKill, func() {
+			kill(fmt.Sprintf("%v of real time", req.WallKill))
+		})
+		stopCPU := startCPULimit(req.CPUKill, func() {
+			kill(fmt.Sprintf("%v of CPU time", req.CPUKill))
 		})
 		result := run(func() {
 			// TODO: add an entrypoint that takes a single test?
@@ -276,6 +292,7 @@ func TestMain(rt Runtime) {
 				SetAbortError(ErrTestFailed)
 			}
 		}, seed, enableTracer, captureLog, logLevelOverride, io.Discard, req.ExtraEnv)
+		stopCPU()
 		stopWall()
 
 		metaResult := runResult{

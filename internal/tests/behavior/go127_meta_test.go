@@ -58,6 +58,26 @@ func TestWallKill(t *testing.T) {
 	}
 }
 
+// TestCPUKill runs the spinning TestWallKill with a limit of CPU time
+// well before its limit of real time: the CPU limit ends it as WallKill
+// would, with what it saved and every goroutine's stack.
+func TestCPUKill(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestWallKill", Seed: 1, ExtraEnv: []string{"TESTINGWALL=1"}, CPUKill: 2 * time.Second, WallKill: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !run.Failed || !run.Ended || string(run.Artifacts["before.txt"]) != "saved" || !strings.Contains(string(run.Artifacts["gosim-stacks.txt"]), "TestWallKill") || !strings.Contains(run.Err, "TestWallKill with seed 1 passed its limit of 2s of CPU time") {
+		t.Errorf("got failed %v, ended %v, err %q, artifacts %q", run.Failed, run.Ended, run.Err, slices.Sorted(maps.Keys(run.Artifacts)))
+	}
+	// A run that ends well within its limit of CPU time passes, and a new
+	// test binary runs it.
+	run, err = metatesting.ForCurrentPackage(t).RunQuiet(&metatesting.RunConfig{Test: "TestWriteArtifact", Seed: 1, CPUKill: time.Hour})
+	if err != nil || run.Failed || string(run.Artifacts["artifact.txt"]) != "hello" {
+		t.Errorf("the next run: %v, %+v", err, run)
+	}
+}
+
 func TestReflectLinkname(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestReflectLinkname", Seed: 1, ExtraEnv: []string{"TESTINGFAIL=1"}})
