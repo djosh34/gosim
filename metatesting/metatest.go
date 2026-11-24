@@ -47,8 +47,9 @@ type RunConfig struct {
 	// process has used that much CPU time in the run, or its CPU time cannot
 	// be read. A run that spins passes it; a run whose process is starved
 	// of CPU does not, so that only WallKill ends it. The limit is checked
-	// once a second: a run found past it only when it ends fails with what
-	// it saved and logged, without stacks, and the binary goes on.
+	// once a second, and once more when the run ends: a run found past it,
+	// or whose CPU time cannot be read, only then fails with what it saved
+	// and logged, without stacks, and the binary goes on.
 	CPUKill time.Duration
 }
 
@@ -88,7 +89,7 @@ type MetaT struct {
 
 var (
 	errEnded    = errors.New("the test binary ended after its run passed RunConfig.WallKill")
-	errEndedCPU = errors.New("the test binary ended after its run passed RunConfig.CPUKill")
+	errEndedCPU = errors.New("the test binary ended after its run passed RunConfig.CPUKill, or its CPU time could not be read")
 )
 
 // fail ends the MetaT's test binary after err, and keeps ForOtherPackage
