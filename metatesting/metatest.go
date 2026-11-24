@@ -306,7 +306,7 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 		// The runtime's error names the limit the run passed, or says that
 		// its CPU time could not be read.
 		if strings.Contains(result.Err, "CPU time") {
-			r.fail(errEndedCPU)
+			r.fail(fmt.Errorf("%w: %s", errEndedCPU, result.Err))
 		} else {
 			r.fail(errEnded)
 		}
