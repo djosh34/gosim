@@ -44,9 +44,11 @@ type RunConfig struct {
 	WallLimit time.Duration
 	WallKill  time.Duration
 	// CPUKill, if set, ends the test binary in the same way once the
-	// process has used that much CPU time in the run. A run that spins
-	// passes it; a run whose process is starved of CPU does not, so that
-	// only WallKill ends it.
+	// process has used that much CPU time in the run, or its CPU time cannot
+	// be read. A run that spins passes it; a run whose process is starved
+	// of CPU does not, so that only WallKill ends it. The limit is checked
+	// once a second: a run found past it only when it ends fails with what
+	// it saved and logged, without stacks, and the binary goes on.
 	CPUKill time.Duration
 }
 
