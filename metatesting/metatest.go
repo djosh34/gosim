@@ -43,6 +43,14 @@ type RunConfig struct {
 	// and Ended set, and the next run starts a new test binary.
 	WallLimit time.Duration
 	WallKill  time.Duration
+	// CPUKill, if set, ends the test binary in the same way once the
+	// process has used that much CPU time in the run, or its CPU time cannot
+	// be read. A run that spins passes it; a run whose process is starved
+	// of CPU does not, so that only WallKill ends it. The limit is checked
+	// once a second, and once more when the run ends: a run found past it,
+	// or whose CPU time cannot be read, only then fails with what it saved
+	// and logged, without stacks, and the binary goes on.
+	CPUKill time.Duration
 }
 
 // A RunResult contains the result fo a test run.
@@ -55,7 +63,7 @@ type RunResult struct {
 	// Artifacts holds the data the run passed to gosim.WriteArtifact, by name.
 	Artifacts map[string][]byte
 	// Ended is set when the test binary ended after this result, as after
-	// RunConfig.WallKill; the next run starts a new one.
+	// RunConfig.WallKill or CPUKill; the next run starts a new one.
 	Ended bool
 }
 
@@ -79,7 +87,10 @@ type MetaT struct {
 	dead error
 }
 
-var errEnded = errors.New("the test binary ended after its run passed RunConfig.WallKill")
+var (
+	errEnded    = errors.New("the test binary ended after its run passed RunConfig.WallKill")
+	errEndedCPU = errors.New("the test binary ended after its run passed RunConfig.CPUKill, or its CPU time could not be read")
+)
 
 // fail ends the MetaT's test binary after err, and keeps ForOtherPackage
 // from handing out the MetaT again.
@@ -292,7 +303,13 @@ func (r *MetaT) RunQuiet(config *RunConfig) (*RunResult, error) {
 		return nil, r.fail(err)
 	}
 	if result.Ended {
-		r.fail(errEnded)
+		// The runtime's error names the limit the run passed, or says that
+		// its CPU time could not be read.
+		if strings.Contains(result.Err, "CPU time") {
+			r.fail(fmt.Errorf("%w: %s", errEndedCPU, result.Err))
+		} else {
+			r.fail(errEnded)
+		}
 	}
 	return &result, nil
 }
