@@ -230,7 +230,8 @@ func (f *HostFile) Slot(owner any, size int) (int64, error) {
 	return off, hostErr(err)
 }
 
-// Close closes the file and gives its space back.
+// Close closes the file. A file of NewHostFile gives its space back; an
+// input or an output stays on the host.
 func (f *HostFile) Close() error {
 	return hostErr(gosimruntime.HostClose(f.h))
 }

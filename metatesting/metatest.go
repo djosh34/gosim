@@ -53,7 +53,10 @@ type RunConfig struct {
 	// path: the simulation makes one with gosim.CreateOutput, and the test
 	// reads it once the run ended. For data too large for an artifact,
 	// which the run's result carries in memory. Writing them changes
-	// nothing in the run.
+	// nothing in the run. Each is made with mode 0600, or cut if it is
+	// there; one the run left open is closed when it ends. A run that
+	// failed, or was killed for its wall time, may leave one written in
+	// part: read it only from a run that did not fail.
 	Outputs map[string]string
 }
 

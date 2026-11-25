@@ -26,20 +26,24 @@ func TestWriteArtifact(t *testing.T) {
 	}
 }
 
-// TestInputChangesNothing runs TestInput with an input and without: the
-// run with it reads the input's bytes, and both draw the same values and
-// end with the same checksum. A run given an input the test does not open
-// plays out the same too.
+// TestOutputChangesNothing runs TestOutput with no output, with an output
+// that is there already (which it cuts), with a new one and one it leaves
+// open, and with an output it does not make: all draw the same values and
+// end with the same checksum, and the host's files hold what the runs
+// wrote. TestOutputSkipped, which never calls CreateOutput, draws the
+// same values too, so no call took a draw, not even the first. An output
+// whose file the host cannot make fails with the host's error.
 func TestOutputChangesNothing(t *testing.T) {
 	dir := t.TempDir()
-	path, other := filepath.Join(dir, "out"), filepath.Join(dir, "other")
+	there, fresh, open, other := filepath.Join(dir, "there"), filepath.Join(dir, "fresh"), filepath.Join(dir, "open"), filepath.Join(dir, "other")
 	// A file there already is cut, not written over in part.
-	if err := os.WriteFile(path, []byte("an older and longer content than the run's"), 0o600); err != nil {
+	if err := os.WriteFile(there, []byte("an older and longer content than the run's"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	mt := metatesting.ForCurrentPackage(t)
 	var runs []*metatesting.RunResult
-	for _, out := range []map[string]string{nil, {"out": path}, {"unused": other}} {
+	outs := []map[string]string{nil, {"out": there}, {"out": fresh, "open": open}, {"unused": other}}
+	for _, out := range outs {
 		run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestOutput", Seed: 3, Outputs: out})
 		if err != nil {
 			t.Fatal(err)
@@ -49,9 +53,31 @@ func TestOutputChangesNothing(t *testing.T) {
 		}
 		runs = append(runs, run)
 	}
-	b, err := os.ReadFile(path)
-	if err != nil || string(b) != "to the host 42" || string(runs[1].Artifacts["back"]) != "to the host 42" {
-		t.Errorf("the output holds %q (%v), and the run read back %q", b, err, runs[1].Artifacts["back"])
+	skipped, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestOutputSkipped", Seed: 3})
+	if err != nil || skipped.Failed {
+		t.Fatalf("TestOutputSkipped: %v, %+v", err, skipped)
+	}
+	for _, c := range []struct {
+		path, want string
+		run        int
+	}{{there, "to the host 42", 1}, {fresh, "to the host 42", 2}, {open, "left open", -1}} {
+		b, err := os.ReadFile(c.path)
+		if err != nil || string(b) != c.want {
+			t.Errorf("%s holds %q (%v), want %q", c.path, b, err, c.want)
+		}
+		if c.run >= 0 && string(runs[c.run].Artifacts["back"]) != c.want {
+			t.Errorf("run %d read back %q", c.run, runs[c.run].Artifacts["back"])
+		}
+	}
+	for _, path := range []string{fresh, open} {
+		if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+			t.Errorf("a new output %s: %v, %v; want mode 0600", path, info, err)
+		}
+	}
+	for _, i := range []int{0, 3} {
+		if b, ok := runs[i].Artifacts["back"]; ok {
+			t.Errorf("run %d, given no output out, read back %q", i, b)
+		}
 	}
 	if _, err := os.Stat(other); !os.IsNotExist(err) {
 		t.Errorf("an output the run did not make is on the host: %v", err)
@@ -61,8 +87,29 @@ func TestOutputChangesNothing(t *testing.T) {
 			t.Errorf("run %d: checksum %x, draws %q; without an output %x, %q", i+1, run.Checksum, run.Artifacts["draws"], runs[0].Checksum, runs[0].Artifacts["draws"])
 		}
 	}
+	// Another test's checksum differs anyway; its draws come from the
+	// same stream, which a draw before them would move.
+	if string(skipped.Artifacts["draws"]) != string(runs[0].Artifacts["draws"]) {
+		t.Errorf("TestOutputSkipped drew %q; TestOutput with no output %q", skipped.Artifacts["draws"], runs[0].Artifacts["draws"])
+	}
+	// An output whose file the host cannot make, in a directory that is
+	// not there or at a directory, fails with the host's error, not as an
+	// output the run was not given.
+	for path, want := range map[string]string{filepath.Join(dir, "gone", "out"): "no such file or directory", dir: "is a directory"} {
+		run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestOutput", Seed: 3, Outputs: map[string]string{"out": path}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !run.Failed || !strings.Contains(string(run.LogOutput), want) {
+			t.Errorf("a run given the output %s: failed %v, log %q, want %q", path, run.Failed, run.LogOutput, want)
+		}
+	}
 }
 
+// TestInputChangesNothing runs TestInput with an input and without: the
+// run with it reads the input's bytes, and both draw the same values and
+// end with the same checksum. A run given an input the test does not open
+// plays out the same too.
 func TestInputChangesNothing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data")
 	if err := os.WriteFile(path, []byte("from the host"), 0o600); err != nil {

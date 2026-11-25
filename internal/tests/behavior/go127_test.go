@@ -208,11 +208,11 @@ func TestHostFile(t *testing.T) {
 }
 
 // TestOutput makes the run's output "out", if the run was given one,
-// writes to it, reads it back and closes it, then draws values from
-// goroutines that wake at one instant and saves them. A run given no
-// output gets fs.ErrNotExist. Its meta test checks that both play out the
-// same and that the host's file holds what was written
-// (TestOutputChangesNothing).
+// writes to it, reads it back and closes it; makes "open", if given, and
+// writes it without closing it; then draws values from goroutines that
+// wake at one instant and saves them. A run given no output gets
+// fs.ErrNotExist. Its meta test checks that all play out the same and
+// that the host's files hold what was written (TestOutputChangesNothing).
 func TestOutput(t *testing.T) {
 	// As TestInput: each branch makes only the calls under test.
 	var missing, again bool
@@ -235,22 +235,20 @@ func TestOutput(t *testing.T) {
 		closeErr = f.Close()
 		_, closedErr = f.WriteAt([]byte("x"), 0)
 	}
-	at := time.Now().Add(time.Second)
-	var out []string
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	for i := range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			time.Sleep(time.Until(at))
-			mu.Lock()
-			out = append(out, fmt.Sprintf("%d:%d", i, mathrand.Uint32()))
-			mu.Unlock()
-		}()
+	// An output written and left open: the run's end closes it, and it
+	// stays on the host.
+	var openErr error
+	g, err := gosim.CreateOutput("open")
+	switch {
+	case err == nil:
+		_, openErr = g.WriteAt([]byte("left open"), 0)
+	case !errors.Is(err, fs.ErrNotExist):
+		t.Fatal(err)
 	}
-	wg.Wait()
-	gosim.WriteArtifact("draws", []byte(strings.Join(out, " ")))
+	drawAfterASecond()
+	if openErr != nil {
+		t.Errorf("a write to an output left open gave %v", openErr)
+	}
 	if f == nil {
 		if !missing || !again {
 			t.Errorf("a missing output gave a *fs.PathError %v, and again fs.ErrNotExist %v", missing, again)
@@ -271,6 +269,34 @@ func TestOutput(t *testing.T) {
 		}
 	}
 	gosim.WriteArtifact("back", back)
+}
+
+// TestOutputSkipped draws as TestOutput does with no call to CreateOutput:
+// a draw that every call to it took, even the first alone, would set
+// TestOutput's runs apart from this one (TestOutputChangesNothing).
+func TestOutputSkipped(t *testing.T) {
+	drawAfterASecond()
+}
+
+// drawAfterASecond draws values from goroutines that wake at one instant
+// and saves them as the artifact "draws".
+func drawAfterASecond() {
+	at := time.Now().Add(time.Second)
+	var out []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Until(at))
+			mu.Lock()
+			out = append(out, fmt.Sprintf("%d:%d", i, mathrand.Uint32()))
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	gosim.WriteArtifact("draws", []byte(strings.Join(out, " ")))
 }
 
 // TestInput opens the run's input "data" and saves what it read, if the

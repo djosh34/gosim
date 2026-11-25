@@ -14,9 +14,11 @@ import (
 // runs it, outside the simulation, to hold more than memory would: a host
 // file. Its reads and writes go to the real disk at once, never block the
 // simulation's clock and draw nothing from the run's random stream, so
-// they change nothing in the run. Each host file is removed from the
-// directory when it is made, so the disk gets its space back when the
-// file is closed, at the latest when its run ends.
+// they change nothing in the run. A host file the simulation makes for
+// itself is removed from the directory when it is made, so the disk gets
+// its space back when the file is closed, at the latest when its run
+// ends. The run's inputs and outputs are files the driver named, which
+// stay.
 
 // hostMu guards the host files. One run at a time uses them, one goroutine
 // at a time, but the end of a run closes them from the scheduler's side.
@@ -284,7 +286,8 @@ func freeSlot(h int, s *slots, off int64) {
 	}
 }
 
-// HostClose closes host file h, which gives its space back.
+// HostClose closes host file h. One the simulation made for itself gives
+// its space back; an input or an output stays.
 func HostClose(h int) error {
 	hostMu.Lock()
 	f, ok := hostFiles[h]
