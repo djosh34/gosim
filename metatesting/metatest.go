@@ -49,6 +49,12 @@ type RunConfig struct {
 	// it acts on what it read. Unlike ExtraEnv, which the run's own
 	// environment holds, they leave every value the run draws as it is.
 	Inputs map[string]string
+	// Outputs are files on the host the run may write, each a name and its
+	// path: the simulation makes one with gosim.CreateOutput, and the test
+	// reads it once the run ended. For data too large for an artifact,
+	// which the run's result carries in memory. Writing them changes
+	// nothing in the run.
+	Outputs map[string]string
 }
 
 // A RunResult contains the result fo a test run.

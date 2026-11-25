@@ -159,6 +159,26 @@ func OpenInput(name string) (*HostFile, error) {
 	return &HostFile{h: h}, nil
 }
 
+// CreateOutput makes the run's output name, a file on the host that the
+// test that started the run named (metatesting.RunConfig.Outputs), or cuts
+// it to empty, as a HostFile to write and read. The file stays on the host
+// after the run, for the test to read. Making it and writing it change
+// nothing in the run, as a HostFile's writes do: none takes a draw or
+// yields, in any build, nor does a failed make. An output the run was not
+// given fails with a *fs.PathError whose Err is fs.ErrNotExist. One it was
+// given whose file the host cannot make fails with the host's error.
+func CreateOutput(name string) (*HostFile, error) {
+	h, err := gosimruntime.HostCreateOutput(name)
+	if errors.Is(err, gosimruntime.ErrNoOutput) {
+		// Built without fmt, as OpenInput's error.
+		return nil, &fs.PathError{Op: "createoutput", Path: name, Err: fs.ErrNotExist}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &HostFile{h: h}, nil
+}
+
 // Size returns the file's size in bytes.
 func (f *HostFile) Size() (int64, error) {
 	n, err := gosimruntime.HostSize(f.h)

@@ -207,6 +207,72 @@ func TestHostFile(t *testing.T) {
 	}
 }
 
+// TestOutput makes the run's output "out", if the run was given one,
+// writes to it, reads it back and closes it, then draws values from
+// goroutines that wake at one instant and saves them. A run given no
+// output gets fs.ErrNotExist. Its meta test checks that both play out the
+// same and that the host's file holds what was written
+// (TestOutputChangesNothing).
+func TestOutput(t *testing.T) {
+	// As TestInput: each branch makes only the calls under test.
+	var missing, again bool
+	var back []byte
+	var writeErr, readErr, closeErr, closedErr error
+	f, err := gosim.CreateOutput("out")
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		var pe *fs.PathError
+		missing = errors.As(err, &pe)
+		_, err2 := gosim.CreateOutput("out")
+		again = errors.Is(err2, fs.ErrNotExist)
+	case err != nil:
+		t.Fatal(err)
+	default:
+		payload := strconv.AppendInt([]byte("to the host "), 42, 10)
+		_, writeErr = f.WriteAt(payload, 0)
+		back = make([]byte, len(payload))
+		_, readErr = f.ReadAt(back, 0)
+		closeErr = f.Close()
+		_, closedErr = f.WriteAt([]byte("x"), 0)
+	}
+	at := time.Now().Add(time.Second)
+	var out []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Until(at))
+			mu.Lock()
+			out = append(out, fmt.Sprintf("%d:%d", i, mathrand.Uint32()))
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	gosim.WriteArtifact("draws", []byte(strings.Join(out, " ")))
+	if f == nil {
+		if !missing || !again {
+			t.Errorf("a missing output gave a *fs.PathError %v, and again fs.ErrNotExist %v", missing, again)
+		}
+		return
+	}
+	for _, c := range []struct {
+		what      string
+		err, want error
+	}{
+		{"a write", writeErr, nil},
+		{"a read back", readErr, nil},
+		{"its close", closeErr, nil},
+		{"a write after its close", closedErr, fs.ErrClosed},
+	} {
+		if !errors.Is(c.err, c.want) && (c.err != nil || c.want != nil) {
+			t.Errorf("%s of an output gave %v, want %v", c.what, c.err, c.want)
+		}
+	}
+	gosim.WriteArtifact("back", back)
+}
+
 // TestInput opens the run's input "data" and saves what it read, if the
 // run was given one, then draws values from goroutines that wake at one
 // instant and saves them. A run given no input gets fs.ErrNotExist. Its

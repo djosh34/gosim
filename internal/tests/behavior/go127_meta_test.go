@@ -30,6 +30,39 @@ func TestWriteArtifact(t *testing.T) {
 // run with it reads the input's bytes, and both draw the same values and
 // end with the same checksum. A run given an input the test does not open
 // plays out the same too.
+func TestOutputChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	path, other := filepath.Join(dir, "out"), filepath.Join(dir, "other")
+	// A file there already is cut, not written over in part.
+	if err := os.WriteFile(path, []byte("an older and longer content than the run's"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mt := metatesting.ForCurrentPackage(t)
+	var runs []*metatesting.RunResult
+	for _, out := range []map[string]string{nil, {"out": path}, {"unused": other}} {
+		run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestOutput", Seed: 3, Outputs: out})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if run.Failed {
+			t.Fatalf("outputs %v: the run failed: %s", out, run.Err)
+		}
+		runs = append(runs, run)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil || string(b) != "to the host 42" || string(runs[1].Artifacts["back"]) != "to the host 42" {
+		t.Errorf("the output holds %q (%v), and the run read back %q", b, err, runs[1].Artifacts["back"])
+	}
+	if _, err := os.Stat(other); !os.IsNotExist(err) {
+		t.Errorf("an output the run did not make is on the host: %v", err)
+	}
+	for i, run := range runs[1:] {
+		if !bytes.Equal(run.Checksum, runs[0].Checksum) || string(run.Artifacts["draws"]) != string(runs[0].Artifacts["draws"]) {
+			t.Errorf("run %d: checksum %x, draws %q; without an output %x, %q", i+1, run.Checksum, run.Artifacts["draws"], runs[0].Checksum, runs[0].Artifacts["draws"])
+		}
+	}
+}
+
 func TestInputChangesNothing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data")
 	if err := os.WriteFile(path, []byte("from the host"), 0o600); err != nil {

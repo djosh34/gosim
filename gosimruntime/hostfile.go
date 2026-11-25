@@ -149,6 +149,52 @@ func HostOpenInput(name string) (int, error) {
 	return hostNext, nil
 }
 
+// A run can also be given files on the host to write, its outputs
+// (RunConfig.Outputs), each by a name: data the test that started the run
+// reads once it ended, too large to hand back as an artifact, which the
+// run's result carries in memory. An output opens as a host file, made or
+// cut to empty; it stays on the host's disk after the run. Opening it and
+// writing it take no draw and never block the simulation's clock, as a
+// host file's do, so a run given an output plays out as the same run
+// without it.
+
+// runOutputs are the paths of the current run's outputs by their names.
+// hostMu guards it.
+var runOutputs map[string]string
+
+// setOutputs sets the current run's outputs, nil for none.
+func setOutputs(out map[string]string) {
+	hostMu.Lock()
+	defer hostMu.Unlock()
+	runOutputs = out
+}
+
+// ErrNoOutput is the error of creating an output the run was not given.
+// The simulation sees it as its own fs.ErrNotExist.
+var ErrNoOutput = errors.New("gosim: no such output")
+
+// HostCreateOutput makes the current run's output name, or cuts it to
+// empty, as a host file to write and read, and returns its handle. An
+// output the run was given whose file the host cannot make fails with the
+// host's error.
+func HostCreateOutput(name string) (int, error) {
+	hostMu.Lock()
+	path, ok := runOutputs[name]
+	hostMu.Unlock()
+	if !ok {
+		return 0, ErrNoOutput
+	}
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return 0, err
+	}
+	hostMu.Lock()
+	defer hostMu.Unlock()
+	hostNext++
+	hostFiles[hostNext] = f
+	return hostNext, nil
+}
+
 // HostSize returns the size in bytes of host file h.
 func HostSize(h int) (int64, error) {
 	f, err := hostFile(h)
