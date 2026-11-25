@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -211,30 +212,31 @@ func TestHostFile(t *testing.T) {
 // instant and saves them. A run given no input gets fs.ErrNotExist. Its
 // meta test checks that both play out the same (TestInputChangesNothing).
 func TestInput(t *testing.T) {
+	// Each branch makes only the calls under test and keeps what they
+	// gave: anything else that might draw, as fmt under the race
+	// detector, waits until after the draws.
+	var missing, again bool
+	var size int64
+	var b []byte
+	var sizeErr, readErr, pastErr, writeErr, emptyErr, closeErr, closedErr error
 	f, err := gosim.OpenInput("data")
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		if _, err := gosim.OpenInput("data"); !errors.Is(err, fs.ErrNotExist) {
-			t.Errorf("a second open of a missing input gave %v", err)
-		}
+		var pe *fs.PathError
+		missing = errors.As(err, &pe)
+		_, err2 := gosim.OpenInput("data")
+		again = errors.Is(err2, fs.ErrNotExist)
 	case err != nil:
 		t.Fatal(err)
 	default:
-		size, err := f.Size()
-		if err != nil {
-			t.Fatal(err)
-		}
-		b := make([]byte, size)
-		if _, err := f.ReadAt(b, 0); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.WriteAt([]byte("x"), 0); err == nil {
-			t.Error("a write to an input did not fail")
-		}
-		gosim.WriteArtifact("input", fmt.Appendf(nil, "%d %s", size, b))
-		if err := f.Close(); err != nil {
-			t.Fatal(err)
-		}
+		size, sizeErr = f.Size()
+		b = make([]byte, size)
+		_, readErr = f.ReadAt(b, 0)
+		_, pastErr = f.ReadAt(make([]byte, 1), size)
+		_, writeErr = f.WriteAt([]byte("x"), 0)
+		_, emptyErr = f.WriteAt(nil, 0)
+		closeErr = f.Close()
+		_, closedErr = f.ReadAt(make([]byte, 1), 0)
 	}
 	at := time.Now().Add(time.Second)
 	var out []string
@@ -252,6 +254,29 @@ func TestInput(t *testing.T) {
 	}
 	wg.Wait()
 	gosim.WriteArtifact("draws", []byte(strings.Join(out, " ")))
+	if f == nil {
+		if !missing || !again {
+			t.Errorf("a missing input gave a *fs.PathError %v, and again fs.ErrNotExist %v", missing, again)
+		}
+		return
+	}
+	for _, c := range []struct {
+		what      string
+		err, want error
+	}{
+		{"its size", sizeErr, nil},
+		{"a read", readErr, nil},
+		{"a read past the end", pastErr, io.EOF},
+		{"a write", writeErr, fs.ErrPermission},
+		{"a write of no bytes", emptyErr, fs.ErrPermission},
+		{"its close", closeErr, nil},
+		{"a read after its close", closedErr, fs.ErrClosed},
+	} {
+		if !errors.Is(c.err, c.want) && (c.err != nil || c.want != nil) {
+			t.Errorf("%s of an input gave %v, want %v", c.what, c.err, c.want)
+		}
+	}
+	gosim.WriteArtifact("input", append(strconv.AppendInt(nil, size, 10), append([]byte(" "), b...)...))
 }
 
 // TestHostFileSlots checks that a simulation's live owners get slots of

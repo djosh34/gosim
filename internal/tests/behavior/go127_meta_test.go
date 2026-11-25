@@ -50,6 +50,20 @@ func TestInputChangesNothing(t *testing.T) {
 	if got := string(runs[1].Artifacts["input"]); got != "13 from the host" {
 		t.Errorf("the run read %q from its input", got)
 	}
+	for _, i := range []int{0, 2} {
+		if b, ok := runs[i].Artifacts["input"]; ok {
+			t.Errorf("run %d, given no input data, read %q", i, b)
+		}
+	}
+	// An input whose file the host cannot open fails the open with the
+	// host's error, not as an input the run was not given.
+	run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestInput", Seed: 3, Inputs: map[string]string{"data": filepath.Join(t.TempDir(), "gone")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !run.Failed || !strings.Contains(string(run.LogOutput), "no such file or directory") {
+		t.Errorf("a run given an input whose file is gone: failed %v, log %q", run.Failed, run.LogOutput)
+	}
 	for i, run := range runs[1:] {
 		if !bytes.Equal(run.Checksum, runs[0].Checksum) || string(run.Artifacts["draws"]) != string(runs[0].Artifacts["draws"]) {
 			t.Errorf("run %d: checksum %x, draws %q; without an input %x, %q", i+1, run.Checksum, run.Artifacts["draws"], runs[0].Checksum, runs[0].Artifacts["draws"])

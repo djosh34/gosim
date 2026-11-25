@@ -72,6 +72,13 @@ func HostWriteAt(h int, p []byte, off int64) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	hostMu.Lock()
+	input := hostInputs[h]
+	hostMu.Unlock()
+	if input {
+		// Also a write of no bytes, which the host would take.
+		return 0, ErrInputWrite
+	}
 	return f.WriteAt(p, off)
 }
 
@@ -113,14 +120,22 @@ func setInputs(in map[string]string) {
 // simulation sees it as its own fs.ErrNotExist.
 var ErrNoInput = errors.New("gosim: no such input")
 
+// ErrInputWrite is the error of a write to an input, which is read-only.
+// The simulation sees it as its own fs.ErrPermission.
+var ErrInputWrite = errors.New("gosim: an input is read-only")
+
+// hostInputs are the host files that are inputs. hostMu guards it.
+var hostInputs = map[int]bool{}
+
 // HostOpenInput opens the current run's input name, read-only, as a host
-// file, and returns its handle.
+// file, and returns its handle. An input the run was given whose file the
+// host cannot open fails with the host's error.
 func HostOpenInput(name string) (int, error) {
 	hostMu.Lock()
 	path, ok := runInputs[name]
 	hostMu.Unlock()
 	if !ok {
-		return 0, fmt.Errorf("%w: %q", ErrNoInput, name)
+		return 0, ErrNoInput
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -130,6 +145,7 @@ func HostOpenInput(name string) (int, error) {
 	defer hostMu.Unlock()
 	hostNext++
 	hostFiles[hostNext] = f
+	hostInputs[hostNext] = true
 	return hostNext, nil
 }
 
@@ -155,6 +171,7 @@ func closeHostFiles() error {
 		errs = append(errs, f.Close())
 		delete(hostFiles, h)
 		delete(hostSlots, h)
+		delete(hostInputs, h)
 	}
 	return errors.Join(errs...)
 }
@@ -227,6 +244,7 @@ func HostClose(h int) error {
 	f, ok := hostFiles[h]
 	delete(hostFiles, h)
 	delete(hostSlots, h)
+	delete(hostInputs, h)
 	hostMu.Unlock()
 	if !ok {
 		return ErrNoHostFile
