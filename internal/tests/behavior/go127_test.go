@@ -206,6 +206,54 @@ func TestHostFile(t *testing.T) {
 	}
 }
 
+// TestInput opens the run's input "data" and saves what it read, if the
+// run was given one, then draws values from goroutines that wake at one
+// instant and saves them. A run given no input gets fs.ErrNotExist. Its
+// meta test checks that both play out the same (TestInputChangesNothing).
+func TestInput(t *testing.T) {
+	f, err := gosim.OpenInput("data")
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		if _, err := gosim.OpenInput("data"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("a second open of a missing input gave %v", err)
+		}
+	case err != nil:
+		t.Fatal(err)
+	default:
+		size, err := f.Size()
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := make([]byte, size)
+		if _, err := f.ReadAt(b, 0); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.WriteAt([]byte("x"), 0); err == nil {
+			t.Error("a write to an input did not fail")
+		}
+		gosim.WriteArtifact("input", fmt.Appendf(nil, "%d %s", size, b))
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := time.Now().Add(time.Second)
+	var out []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Until(at))
+			mu.Lock()
+			out = append(out, fmt.Sprintf("%d:%d", i, mathrand.Uint32()))
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	gosim.WriteArtifact("draws", []byte(strings.Join(out, " ")))
+}
+
 // TestHostFileSlots checks that a simulation's live owners get slots of
 // their own in a host file, which keep what is written to them.
 func TestHostFileSlots(t *testing.T) {

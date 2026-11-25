@@ -2,6 +2,7 @@ package gosim
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"time"
@@ -137,10 +138,32 @@ func CreateHostFile() (*HostFile, error) {
 	return &HostFile{h: h}, nil
 }
 
+// OpenInput opens the run's input name, a file on the host that the test
+// that started the run gave it (metatesting.RunConfig.Inputs), as a
+// HostFile to read: a write to it fails. Opening it and reading it change
+// nothing in the run, as a HostFile's reads do. An input the run was not
+// given fails with fs.ErrNotExist.
+func OpenInput(name string) (*HostFile, error) {
+	h, err := gosimruntime.HostOpenInput(name)
+	if err != nil {
+		return nil, hostErr(err)
+	}
+	return &HostFile{h: h}, nil
+}
+
+// Size returns the file's size in bytes.
+func (f *HostFile) Size() (int64, error) {
+	n, err := gosimruntime.HostSize(f.h)
+	return n, hostErr(err)
+}
+
 // hostErr is err as the simulation sees it.
 func hostErr(err error) error {
-	if errors.Is(err, gosimruntime.ErrNoHostFile) {
+	switch {
+	case errors.Is(err, gosimruntime.ErrNoHostFile):
 		return fs.ErrClosed
+	case errors.Is(err, gosimruntime.ErrNoInput):
+		return fmt.Errorf("%w: %v", fs.ErrNotExist, err)
 	}
 	return err
 }

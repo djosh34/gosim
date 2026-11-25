@@ -3,7 +3,10 @@
 package behavior_test
 
 import (
+	"bytes"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -20,6 +23,37 @@ func TestWriteArtifact(t *testing.T) {
 	}
 	if run.Failed || string(run.Artifacts["artifact.txt"]) != "hello" {
 		t.Errorf("got failed %v, artifacts %q", run.Failed, run.Artifacts)
+	}
+}
+
+// TestInputChangesNothing runs TestInput with an input and without: the
+// run with it reads the input's bytes, and both draw the same values and
+// end with the same checksum. A run given an input the test does not open
+// plays out the same too.
+func TestInputChangesNothing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "data")
+	if err := os.WriteFile(path, []byte("from the host"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mt := metatesting.ForCurrentPackage(t)
+	var runs []*metatesting.RunResult
+	for _, in := range []map[string]string{nil, {"data": path}, {"other": path}} {
+		run, err := mt.RunQuiet(&metatesting.RunConfig{Test: "TestInput", Seed: 3, Inputs: in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if run.Failed {
+			t.Fatalf("inputs %v: the run failed: %s", in, run.Err)
+		}
+		runs = append(runs, run)
+	}
+	if got := string(runs[1].Artifacts["input"]); got != "13 from the host" {
+		t.Errorf("the run read %q from its input", got)
+	}
+	for i, run := range runs[1:] {
+		if !bytes.Equal(run.Checksum, runs[0].Checksum) || string(run.Artifacts["draws"]) != string(runs[0].Artifacts["draws"]) {
+			t.Errorf("run %d: checksum %x, draws %q; without an input %x, %q", i+1, run.Checksum, run.Artifacts["draws"], runs[0].Checksum, runs[0].Artifacts["draws"])
+		}
 	}
 }
 
