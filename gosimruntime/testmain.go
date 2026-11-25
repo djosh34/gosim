@@ -42,6 +42,7 @@ type runConfig struct {
 	Simtrace  string
 	WallLimit time.Duration
 	WallKill  time.Duration
+	Inputs    map[string]string
 }
 
 // Copied in metatesting.RunResult. Keep in sync.
@@ -263,6 +264,7 @@ func TestMain(rt Runtime) {
 			}
 			os.Exit(2)
 		})
+		setInputs(req.Inputs)
 		result := run(func() {
 			// TODO: add an entrypoint that takes a single test?
 			// TODO: fail gracefully with non-existent tests?
@@ -276,6 +278,7 @@ func TestMain(rt Runtime) {
 				SetAbortError(ErrTestFailed)
 			}
 		}, seed, enableTracer, captureLog, logLevelOverride, io.Discard, req.ExtraEnv)
+		setInputs(nil)
 		stopWall()
 
 		metaResult := runResult{

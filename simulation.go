@@ -137,10 +137,41 @@ func CreateHostFile() (*HostFile, error) {
 	return &HostFile{h: h}, nil
 }
 
+// OpenInput opens the run's input name, a file on the host that the test
+// that started the run gave it (metatesting.RunConfig.Inputs), as a
+// HostFile to read. Opening it, its size and its reads change nothing in
+// the run, as a HostFile's reads do: none takes a draw or yields, in any
+// build, nor does a failed open. An input the run was not given fails with
+// a *fs.PathError whose Err is fs.ErrNotExist. One it was given whose file
+// the host cannot open fails with the host's error, which errors.Is
+// cannot match against the simulation's own: the test that named the
+// file got it wrong. A write to an input fails with fs.ErrPermission.
+func OpenInput(name string) (*HostFile, error) {
+	h, err := gosimruntime.HostOpenInput(name)
+	if errors.Is(err, gosimruntime.ErrNoInput) {
+		// Built without fmt: a translated fmt takes a draw under the race
+		// detector, as it returns its printer to a sync.Pool.
+		return nil, &fs.PathError{Op: "openinput", Path: name, Err: fs.ErrNotExist}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &HostFile{h: h}, nil
+}
+
+// Size returns the file's size in bytes.
+func (f *HostFile) Size() (int64, error) {
+	n, err := gosimruntime.HostSize(f.h)
+	return n, hostErr(err)
+}
+
 // hostErr is err as the simulation sees it.
 func hostErr(err error) error {
-	if errors.Is(err, gosimruntime.ErrNoHostFile) {
+	switch {
+	case errors.Is(err, gosimruntime.ErrNoHostFile):
 		return fs.ErrClosed
+	case errors.Is(err, gosimruntime.ErrInputWrite):
+		return fs.ErrPermission
 	}
 	return err
 }

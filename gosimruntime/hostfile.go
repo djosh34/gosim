@@ -72,6 +72,13 @@ func HostWriteAt(h int, p []byte, off int64) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	hostMu.Lock()
+	input := hostInputs[h]
+	hostMu.Unlock()
+	if input {
+		// Also a write of no bytes, which the host would take.
+		return 0, ErrInputWrite
+	}
 	return f.WriteAt(p, off)
 }
 
@@ -90,6 +97,71 @@ func HostReadAt(h int, p []byte, off int64) (n int, eof bool, err error) {
 	return n, false, err
 }
 
+// A run can also be given files on the host to read, its inputs
+// (RunConfig.Inputs), each by a name: data made outside the simulation,
+// such as what an earlier run saved as an artifact. An input opens as a
+// host file, read-only. Opening it, its size and its reads take no draw
+// and never block the simulation's clock, as a host file's do, so a run
+// given an input plays out as the same run without it until it acts on
+// what it read.
+
+// runInputs are the paths of the current run's inputs by their names.
+// hostMu guards it.
+var runInputs map[string]string
+
+// setInputs sets the current run's inputs, nil for none.
+func setInputs(in map[string]string) {
+	hostMu.Lock()
+	defer hostMu.Unlock()
+	runInputs = in
+}
+
+// ErrNoInput is the error of opening an input the run was not given. The
+// simulation sees it as its own fs.ErrNotExist.
+var ErrNoInput = errors.New("gosim: no such input")
+
+// ErrInputWrite is the error of a write to an input, which is read-only.
+// The simulation sees it as its own fs.ErrPermission.
+var ErrInputWrite = errors.New("gosim: an input is read-only")
+
+// hostInputs are the host files that are inputs. hostMu guards it.
+var hostInputs = map[int]bool{}
+
+// HostOpenInput opens the current run's input name, read-only, as a host
+// file, and returns its handle. An input the run was given whose file the
+// host cannot open fails with the host's error.
+func HostOpenInput(name string) (int, error) {
+	hostMu.Lock()
+	path, ok := runInputs[name]
+	hostMu.Unlock()
+	if !ok {
+		return 0, ErrNoInput
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	hostMu.Lock()
+	defer hostMu.Unlock()
+	hostNext++
+	hostFiles[hostNext] = f
+	hostInputs[hostNext] = true
+	return hostNext, nil
+}
+
+// HostSize returns the size in bytes of host file h.
+func HostSize(h int) (int64, error) {
+	f, err := hostFile(h)
+	if err != nil {
+		return 0, err
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return fi.Size(), nil
+}
+
 // closeHostFiles closes the host files a run left open, as it ends.
 func closeHostFiles() error {
 	hostMu.Lock()
@@ -99,6 +171,7 @@ func closeHostFiles() error {
 		errs = append(errs, f.Close())
 		delete(hostFiles, h)
 		delete(hostSlots, h)
+		delete(hostInputs, h)
 	}
 	return errors.Join(errs...)
 }
@@ -171,6 +244,7 @@ func HostClose(h int) error {
 	f, ok := hostFiles[h]
 	delete(hostFiles, h)
 	delete(hostSlots, h)
+	delete(hostInputs, h)
 	hostMu.Unlock()
 	if !ok {
 		return ErrNoHostFile

@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -204,6 +205,78 @@ func TestHostFile(t *testing.T) {
 	if err := f.Close(); !errors.Is(err, fs.ErrClosed) {
 		t.Errorf("a second close gave %v, want fs.ErrClosed", err)
 	}
+}
+
+// TestInput opens the run's input "data" and saves what it read, if the
+// run was given one, then draws values from goroutines that wake at one
+// instant and saves them. A run given no input gets fs.ErrNotExist. Its
+// meta test checks that both play out the same (TestInputChangesNothing).
+func TestInput(t *testing.T) {
+	// Each branch makes only the calls under test and keeps what they
+	// gave: anything else that might draw, as fmt under the race
+	// detector, waits until after the draws.
+	var missing, again bool
+	var size int64
+	var b []byte
+	var sizeErr, readErr, pastErr, writeErr, emptyErr, closeErr, closedErr error
+	f, err := gosim.OpenInput("data")
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		var pe *fs.PathError
+		missing = errors.As(err, &pe)
+		_, err2 := gosim.OpenInput("data")
+		again = errors.Is(err2, fs.ErrNotExist)
+	case err != nil:
+		t.Fatal(err)
+	default:
+		size, sizeErr = f.Size()
+		b = make([]byte, size)
+		_, readErr = f.ReadAt(b, 0)
+		_, pastErr = f.ReadAt(make([]byte, 1), size)
+		_, writeErr = f.WriteAt([]byte("x"), 0)
+		_, emptyErr = f.WriteAt(nil, 0)
+		closeErr = f.Close()
+		_, closedErr = f.ReadAt(make([]byte, 1), 0)
+	}
+	at := time.Now().Add(time.Second)
+	var out []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Until(at))
+			mu.Lock()
+			out = append(out, fmt.Sprintf("%d:%d", i, mathrand.Uint32()))
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	gosim.WriteArtifact("draws", []byte(strings.Join(out, " ")))
+	if f == nil {
+		if !missing || !again {
+			t.Errorf("a missing input gave a *fs.PathError %v, and again fs.ErrNotExist %v", missing, again)
+		}
+		return
+	}
+	for _, c := range []struct {
+		what      string
+		err, want error
+	}{
+		{"its size", sizeErr, nil},
+		{"a read", readErr, nil},
+		{"a read past the end", pastErr, io.EOF},
+		{"a write", writeErr, fs.ErrPermission},
+		{"a write of no bytes", emptyErr, fs.ErrPermission},
+		{"its close", closeErr, nil},
+		{"a read after its close", closedErr, fs.ErrClosed},
+	} {
+		if !errors.Is(c.err, c.want) && (c.err != nil || c.want != nil) {
+			t.Errorf("%s of an input gave %v, want %v", c.what, c.err, c.want)
+		}
+	}
+	gosim.WriteArtifact("input", append(strconv.AppendInt(nil, size, 10), append([]byte(" "), b...)...))
 }
 
 // TestHostFileSlots checks that a simulation's live owners get slots of

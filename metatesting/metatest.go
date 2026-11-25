@@ -43,6 +43,12 @@ type RunConfig struct {
 	// and Ended set, and the next run starts a new test binary.
 	WallLimit time.Duration
 	WallKill  time.Duration
+	// Inputs are files on the host the run may read, each a name and its
+	// path: the simulation opens one with gosim.OpenInput. Reading them
+	// changes nothing in the run, which plays out as without them until
+	// it acts on what it read. Unlike ExtraEnv, which the run's own
+	// environment holds, they leave every value the run draws as it is.
+	Inputs map[string]string
 }
 
 // A RunResult contains the result fo a test run.
